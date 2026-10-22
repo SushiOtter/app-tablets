@@ -1,25 +1,79 @@
 import { appState } from "./state.js";
 import { $, escapeHTML } from "./utils.js";
-import { renderDevices } from "./panels.js?v=18";
+import { renderDevices } from "./panels.js?v=21";
 
 const objectUrls = new Set();
 let selectedStationId = "";
 const MEDIA_STORAGE_KEY = "beauty-tech-retail-media-urls-v1";
+const MEDIA_SLOT_COUNT = 6;
+const DEFAULT_DEMO_MEDIA = {
+  cosmetics: {
+    name: "Demostración de cosmética · Sha'Boris · CC BY-SA 4.0",
+    url: "https://upload.wikimedia.org/wikipedia/commons/3/30/Cosmetics.webmhd.webm"
+  },
+  hair: {
+    name: "Corte de cabello · Blackgirlmighty · CC0",
+    url: "https://upload.wikimedia.org/wikipedia/commons/f/f3/Hair_cutting_in_Botswana.webm"
+  }
+};
+const MEDIA_AUDIENCES = [
+  ["all", "Vídeo general (reserva)"],
+  ["under18", "Menos de 18 · estimación visual"],
+  ["18-24", "18–24 · estimación visual"],
+  ["25-34", "25–34 · estimación visual"],
+  ["35-44", "35–44 · estimación visual"],
+  ["45-plus", "45 o más · estimación visual"],
+  ["curly", "Pelo rizado · solo etiqueta manual"],
+  ["straight", "Pelo liso · solo etiqueta manual"],
+  ["short", "Pelo corto · solo etiqueta manual"],
+  ["long", "Pelo largo · solo etiqueta manual"],
+  ["beard", "Con barba · solo etiqueta manual"],
+  ["no-beard", "Sin barba · solo etiqueta manual"]
+];
 
 function currentStation() {
   return appState.stations.get(selectedStationId) || [...appState.stations.values()][0] || null;
 }
 
+function ensureMediaSlots(station) {
+  if (!Array.isArray(station.mediaFiles)) station.mediaFiles = [];
+  while (station.mediaFiles.length < MEDIA_SLOT_COUNT) station.mediaFiles.push(null);
+}
+
+function renderMediaSlots() {
+  const host = $("#media-slots");
+  if (!host) return;
+  host.innerHTML = Array.from({ length: MEDIA_SLOT_COUNT }, (_, slot) => {
+    const number = slot + 1;
+    const options = MEDIA_AUDIENCES.map(([value, label]) =>
+      `<option value="${value}">${escapeHTML(label)}</option>`).join("");
+    return `<div class="media-slot">
+      <strong>Vídeo ${number}</strong>
+      <label class="media-field" for="media-video-${number}">Archivo de vídeo
+        <input id="media-video-${number}" class="media-input" type="file" accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogv,.ogg">
+      </label>
+      <label class="media-field" for="media-url-${number}">o enlace directo
+        <input id="media-url-${number}" class="media-input media-url-input" type="url" placeholder="https://..." autocomplete="off">
+      </label>
+      <button class="button button-secondary media-add-url" data-media-url-slot="${slot}" type="button">Preparar enlace</button>
+      <label class="media-field" for="media-audience-${number}">Mostrar cuando la cámara estime
+        <select id="media-audience-${number}" class="field-select media-audience">${options}</select>
+      </label>
+      <small id="media-name-${number}">Sin vídeo seleccionado</small>
+    </div>`;
+  }).join("");
+}
+
 function updateMediaLabels() {
   const station = currentStation();
   if (!station) return;
-  station.mediaFiles ||= [null, null];
-  $("#media-name-1").textContent = station.mediaFiles[0]?.name || "Sin vídeo seleccionado";
-  $("#media-name-2").textContent = station.mediaFiles[1]?.name || "Sin vídeo seleccionado";
-  $("#media-url-1").value = station.mediaFiles[0]?.sourceUrl || "";
-  $("#media-url-2").value = station.mediaFiles[1]?.sourceUrl || "";
-  $("#media-audience-1").value = station.mediaFiles[0]?.audience || "all";
-  $("#media-audience-2").value = station.mediaFiles[1]?.audience || "all";
+  ensureMediaSlots(station);
+  station.mediaFiles.forEach((media, slot) => {
+    const number = slot + 1;
+    $(`#media-name-${number}`).textContent = media?.name || "Sin vídeo seleccionado";
+    $(`#media-url-${number}`).value = media?.sourceUrl || "";
+    $(`#media-audience-${number}`).value = media?.audience || "all";
+  });
 }
 
 function releaseMedia(station, slot) {
@@ -33,7 +87,7 @@ function releaseMedia(station, slot) {
 function saveMediaLinks() {
   const links = Object.fromEntries([...appState.stations.values()].map(station => [
     station.id,
-    (station.mediaFiles || [null, null]).map(media => media?.sourceUrl
+    (station.mediaFiles || []).map(media => media?.sourceUrl
       ? { url: media.sourceUrl, audience: media.audience || "all" }
       : null)
   ]));
@@ -48,7 +102,7 @@ function saveMediaLinks() {
 
 function setMedia(station, slot, media, persistLink = false) {
   const replacingSavedLink = Boolean(station.mediaFiles?.[slot]?.sourceUrl);
-  station.mediaFiles ||= [null, null];
+  ensureMediaSlots(station);
   media.audience = $(`#media-audience-${slot + 1}`)?.value || "all";
   releaseMedia(station, slot);
   station.mediaFiles[slot] = media;
@@ -127,8 +181,8 @@ function restoreMediaLinks() {
     for (const [stationId, urls] of Object.entries(saved)) {
       const station = appState.stations.get(stationId);
       if (!station || !Array.isArray(urls)) continue;
-      station.mediaFiles = [null, null];
-      urls.slice(0, 2).forEach((value, slot) => {
+      station.mediaFiles = Array(MEDIA_SLOT_COUNT).fill(null);
+      urls.slice(0, MEDIA_SLOT_COUNT).forEach((value, slot) => {
         const sourceUrl = typeof value === "string" ? value : value?.url;
         if (typeof sourceUrl !== "string" || !sourceUrl.trim()) return;
         try {
@@ -146,24 +200,42 @@ function restoreMediaLinks() {
   }
 }
 
+function seedDemoVideos() {
+  for (const station of appState.stations.values()) {
+    ensureMediaSlots(station);
+    if (station.mediaFiles.some(media => media?.url)) continue;
+    const demo = ["haircare", "haircolor"].includes(station.id)
+      ? DEFAULT_DEMO_MEDIA.hair
+      : DEFAULT_DEMO_MEDIA.cosmetics;
+    station.mediaFiles[0] = {
+      ...demo,
+      kind: "video",
+      audience: "all",
+      builtIn: true
+    };
+  }
+}
+
 export function initializeMediaControls() {
   const select = $("#media-station");
   if (!select) return;
   restoreMediaLinks();
+  seedDemoVideos();
+  renderMediaSlots();
   select.innerHTML = [...appState.stations.values()].map(station => `<option value="${station.id}">${escapeHTML(station.name)}</option>`).join("");
   selectedStationId = select.value;
   updateMediaLabels();
   select.addEventListener("change", () => {
     selectedStationId = select.value;
-    $("#media-video-1").value = "";
-    $("#media-video-2").value = "";
+    document.querySelectorAll("#media-slots input[type=file]").forEach(input => { input.value = ""; });
     updateMediaLabels();
     $("#media-status").textContent = `Configurando contenido para ${currentStation()?.name || "la estación"}.`;
   });
-  $("#media-video-1")?.addEventListener("change", event => setVideo(0, event.target.files?.[0]));
-  $("#media-video-2")?.addEventListener("change", event => setVideo(1, event.target.files?.[0]));
+  document.querySelectorAll("#media-slots input[type=file]").forEach(input => input.addEventListener("change", event => {
+    setVideo(Number(input.id.split("-").at(-1)) - 1, event.target.files?.[0]);
+  }));
   document.querySelectorAll(".media-audience").forEach(select => select.addEventListener("change", () => {
-    const slot = Number(select.id.slice(-1)) - 1;
+    const slot = Number(select.id.split("-").at(-1)) - 1;
     const station = currentStation();
     if (!station?.mediaFiles?.[slot]) return;
     station.mediaFiles[slot].audience = select.value;

@@ -1,6 +1,6 @@
 # Beauty Tech Retail Experience
 
-**Versión 18.** Prototipo navegable para presentar una experiencia de retail de belleza con cinco estaciones, un panel de administración y una vista pública separada.
+**Versión 21.** Prototipo navegable para presentar una experiencia de retail de belleza con cinco estaciones, un panel de administración y una vista pública separada.
 
 Prototipo web local para presentar una experiencia de recomendación automática en una tienda de belleza. Incluye cinco estaciones comerciales, una pantalla de entrada/sensor conceptual, administración, modo público y detección experimental de personas mediante cámara.
 
@@ -17,7 +17,7 @@ Se recomienda Python 3; no requiere Node.js ni instalación de paquetes. No abra
 
 1. La entrada normal es el modo trabajador: selecciona una sección activa y pulsa **Iniciar experiencia**. La primera sección activa aparece preseleccionada.
 2. Permite el acceso a la cámara. La tablet entra en pantalla completa y espera; cuando detecta presencia, muestra automáticamente el contenido en bucle. Al alejarse la persona, vuelve a esperar. **Salir · Administración** detiene la cámara y abre la configuración.
-3. Para preparar contenido, pulsa **Administración**. En «Vídeos de demostración», asigna a cada sección hasta dos vídeos MP4/WebM/Ogg. Se pueden etiquetar para audiencia/perfil; los enlaces directos compatibles se reproducen automáticamente. YouTube, TikTok e Instagram se abren fuera de la experiencia, así que no son aptos para el bucle automático.
+3. Para probar el contenido no hace falta cargar nada: la demo prepara automáticamente un enlace a un vídeo genérico de cosmética o cabello según la sección elegida y lo reproduce al detectar presencia. Se necesita internet para obtenerlo de Wikimedia Commons. En «Vídeos de demostración» puedes sustituirlo por contenido autorizado de tus productos. La cámara estima un rango de edad aproximado para las sugerencias, pero no reconoce características del pelo ni barba. YouTube, TikTok e Instagram no son aptos para el bucle automático.
 4. Si no puedes usar una cámara durante la presentación, **Probar estación** y **Iniciar demostración guiada** simulan el flujo; la pantalla indica que es una simulación.
 
 ## Funciones implementadas
@@ -26,13 +26,13 @@ Se recomienda Python 3; no requiere Node.js ni instalación de paquetes. No abra
 - Guardado local de configuración, zonas de cámara, confianza mínima y duración de la demostración; **Restaurar valores iniciales** restaura preferencias y estaciones.
 - Modo público sin controles administrativos, sensor ni códigos técnicos.
 - Prueba manual individual, prueba rápida y recorrido guiado secuencial (12–45 s por estación), completamente utilizable sin cámara.
-- Hasta dos vídeos por estación: archivos locales (MP4, WebM u Ogg), URLs de YouTube, TikTok o Instagram y enlaces directos a esos formatos. Los vídeos locales y enlaces directos compatibles se reproducen en secuencia al terminar cada clip y en bucle mientras dura la presencia; las redes sociales se abren fuera de la app y no forman parte del bucle. Los archivos locales no se suben y deben seleccionarse de nuevo tras recargar.
+- Se incluyen dos vídeos genéricos con licencias abiertas. La aplicación asigna automáticamente la demostración de cosmética a las estaciones de cosmética y la de corte a las secciones capilares. Los vídeos se reproducen en bucle mientras dura la presencia; los trabajadores pueden sustituirlos por contenido autorizado desde Administración.
 - Configuración inicial de estaciones en `data/contenido.json`.
 - Motor de eventos `beautytech:event` y estados `idle`, `attention`, `playing`, `cooldown` y `disabled`.
 - Recomendación demostrativa de dos piezas por estación, con transición y regreso al reposo.
-- Detección experimental con BlazeFace/TensorFlow.js y COCO-SSD. Al detectar un rostro en modo público, carga @vladmandic/face-api y estima localmente un rango de edad; muestra sugerencias de producto y permite corregir el rango.
+- Detección experimental con BlazeFace/TensorFlow.js y COCO-SSD. Al detectar un rostro, carga @vladmandic/face-api en segundo plano y estima localmente un rango de edad aproximado para priorizar vídeos y sugerencias generales.
 - Modo presentación a pantalla completa: una selección de sección y un toque inician la cámara y el modo público. Solo se ve esa sección, una indicación de espera cuando no hay nadie, y el botón de salida arriba a la derecha (también Escape). Al detectar presencia se muestran los clips/vídeos en bucle; el ciclo se detiene al perder presencia.
-- Perfil de escenario opcional para probar selección de vídeos por rango de edad, textura y longitud del pelo o vello facial. El trabajador lo selecciona manualmente; la cámara solo detecta presencia y no infiere género ni rasgos personales.
+- Perfil de escenario opcional para probar etiquetas manuales de textura y longitud del pelo o vello facial. La cámara no los infiere, ni determina género o necesidades.
 - Cada vídeo se puede asignar a un perfil orientativo; con un escenario elegido, la reproducción prioriza vídeos coincidentes y añade los marcados para cualquier perfil.
 - Reproducción de vídeos MP4, WebM u Ogg en secuencia con avance al final real del vídeo y repetición en bucle mientras dura la presencia. Para una presentación fiable, prepara los vídeos locales o enlaces directos compatibles con antelación.
 - Recomendaciones orientativas por rangos: menos de 18, 18–24, 25–34, 35–44 y 45 o más. No se muestra una edad exacta ni se utilizan predicciones de género.
@@ -43,13 +43,14 @@ Se recomienda Python 3; no requiere Node.js ni instalación de paquetes. No abra
 ## Límites importantes
 
 - La estimación visual de edad puede ser inexacta y no representa la edad real. El rango solo selecciona sugerencias generales; la edad no determina las necesidades de la piel.
-- La cámara de esta demo no detecta ni clasifica género, barba, longitud del pelo o pelo rizado/liso. Tampoco determina qué necesita alguien; las recomendaciones por edad son ideas generales y experimentales. Para una sección capilar, se pueden preparar vídeos organizados por tipo de producto o necesidad del catálogo, sin inferir rasgos personales.
+- La cámara solo clasifica presencia y estima un rango de edad orientativo; no detecta género, barba, longitud o textura del pelo, ni determina necesidades. Etiquetas como pelo liso/rizado o barba se asignan manualmente y no activan una detección visual automática.
 - La IA no identifica personas, no detecta la mirada y no confirma interés real. No realiza reconocimiento de identidad ni usa predicciones de género.
 - La zona se calcula dividiendo la imagen en cinco franjas horizontales. El empleado debe asociarlas manualmente a las estaciones visibles de izquierda a derecha. No es una calibración física de la tienda.
 - La presencia sostenida y el tamaño de la detección son aproximaciones, no una medición fiable de distancia o atención.
 - El código no guarda ni envía fotogramas. La inferencia y el rango estimado se procesan en el navegador; el rango permanece solo en la vista pública mientras está abierta y no se guarda ni se envía a un servidor. El navegador necesita permiso explícito para activar la cámara.
-- No se incluyen vídeos comerciales ni fotografías de producto. Sin vídeos locales, las estaciones muestran composiciones visuales propias de demostración.
+- Los vídeos incluidos son ejemplos genéricos, no anuncios ni productos reales de la tienda. La edad estimada adapta las sugerencias de producto, pero no selecciona un clip distinto por edad. La cámara no clasifica pelo, barba ni textura; para personalizar vídeos según esas características hace falta integrar y validar un modelo dedicado y disponer de clips adecuados.
 - No incluye comunicación entre tablets físicas, backend, modo kiosco ni analítica de producción.
+- Atribución de los vídeos de muestra: “Cosmetics.webmhd.webm”, Sha'Boris, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Cosmetics.webmhd.webm); “Hair cutting in Botswana.webm”, Blackgirlmighty, [CC0](https://creativecommons.org/publicdomain/zero/1.0/), [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Hair_cutting_in_Botswana.webm).
 - La cámara usa BlazeFace/TensorFlow.js desde jsDelivr y necesita permiso, navegador compatible e internet en el primer arranque. La IA disponible detecta rostro/persona y puede estimar un rango de edad orientativo en segundo plano; no reconoce género, barba, longitud ni textura del pelo.
 - El recorrido guiado es una simulación para presentar el flujo; no representa una detección real. Para un despliegue real hay que revisar accesibilidad, rendimiento, dispositivos, consentimiento/información, base jurídica y obligaciones de privacidad con los responsables correspondientes.
 

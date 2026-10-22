@@ -1,8 +1,8 @@
 import { appState } from "./state.js";
 import { $, announce, escapeHTML } from "./utils.js";
-import { renderDevices } from "./panels.js?v=18";
-import { emitEvent, resetStation, resetStations } from "./events.js?v=18";
-import { initializeCameraControls, resetCameraPreferences, startCamera, stopCamera } from "./camera.js?v=18";
+import { renderDevices } from "./panels.js?v=21";
+import { emitEvent, resetStation, resetStations } from "./events.js?v=21";
+import { initializeCameraControls, resetCameraPreferences, startCamera, stopCamera } from "./camera.js?v=21";
 import { clearSavedConfiguration, loadConfiguration, renderConfigs, saveConfiguration } from "./configuration.js";
 import { ageProfiles, getAgeProfile } from "./products.js";
 

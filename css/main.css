@@ -133,13 +133,16 @@ button:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
 .boot-warning strong, .boot-warning span { display: block; }
 .boot-warning span { margin-top: 4px; }
 
-.media-controls { display: grid; grid-template-columns: minmax(160px, .8fr) repeat(2, minmax(180px, 1fr)); gap: 14px; align-items: start; }
+.media-controls { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+.media-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .media-field { display: grid; gap: 8px; font-size: .78rem; font-weight: 600; min-width: 0; }
 .media-input { display: block; width: 100%; max-width: 100%; font: inherit; font-size: .72rem; color: var(--muted); }
 .media-field small { min-height: 1.2em; color: var(--muted); font-weight: 400; overflow-wrap: anywhere; }
-.media-slot { display: grid; align-content: start; gap: 9px; min-width: 0; }
+.media-slot { display: grid; align-content: start; gap: 9px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,253,249,.65); }
+.media-slot > strong { color: var(--ink); font-size: 11px; }
 .media-slot .media-field { gap: 6px; }
 .media-url-input { min-height: 36px; padding: 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--ivory); color: var(--ink); }
 .media-add-url { justify-self: start; }
 .media-status { margin: 12px 0 0; font-size: .78rem; color: var(--muted); }
-@media (max-width: 760px) { .media-controls { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .media-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .media-controls, .media-slots { grid-template-columns: 1fr; } }

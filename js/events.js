@@ -1,6 +1,6 @@
 import { appState, stationStates } from "./state.js";
 import { announce } from "./utils.js";
-import { renderDevices } from "./panels.js?v=18";
+import { renderDevices } from "./panels.js?v=21";
 
 const timers = new Map();
 const attentionTimers = new Map();
@@ -30,8 +30,13 @@ export function initializeEventEngine() {
     station.activeSignals ||= {};
     station.activeSignals.ageGroup = detail.ageGroup;
     const playlist = buildMediaPlaylist(station, station.activeSignals);
-    if (!playlist.length || playlist[0] === station.mediaSlot) return;
+    if (!playlist.length) return;
     station.mediaPlaylist = playlist;
+    const currentIndex = playlist.indexOf(station.mediaSlot);
+    if (currentIndex === 0) {
+      station.mediaCursor = 0;
+      return;
+    }
     station.mediaCursor = 0;
     playNextMedia(station);
   });
@@ -104,12 +109,14 @@ function rankClips(station, signals = {}) {
 
 function buildMediaPlaylist(station, signals = {}) {
   const profile = signals.demoProfile || appState.demoProfile || {};
-  const profileValues = [signals.ageGroup, profile.ageRange, profile.hairTexture, profile.hairLength, profile.beard].filter(Boolean);
+  const detectedAge = signals.ageGroup;
+  const profileValues = [profile.ageRange, profile.hairTexture, profile.hairLength, profile.beard].filter(Boolean);
   const availableMedia = (station.mediaFiles || []).map((media, slot) => ({ media, slot }))
     .filter(item => item.media && item.media.kind !== "external" && !item.media.failed);
-  const matchingMedia = availableMedia.filter(({ media }) => media.audience && media.audience !== "all" && profileValues.includes(media.audience));
+  const matchingMedia = availableMedia.filter(({ media }) =>
+    media.audience && media.audience !== "all" && (media.audience === detectedAge || profileValues.includes(media.audience)));
   const generalMedia = availableMedia.filter(({ media }) => !media.audience || media.audience === "all");
-  return (profileValues.length ? [...matchingMedia, ...generalMedia] : generalMedia).map(item => item.slot);
+  return [...matchingMedia, ...generalMedia].map(item => item.slot);
 }
 
 function activateStation(id, signals = {}) {

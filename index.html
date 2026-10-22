@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#1b1816">
   <title>Beauty Tech — Experiencia de retail inteligente</title>
   <link rel="icon" href="assets/icons/beauty-tech.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/tokens.css?v=18">
-  <link rel="stylesheet" href="css/fonts.css?v=18">
-  <link rel="stylesheet" href="css/main.css?v=18">
-  <link rel="stylesheet" href="css/layout.css?v=18">
-  <link rel="stylesheet" href="css/components.css?v=18">
-  <link rel="stylesheet" href="css/animations.css?v=18">
-  <link rel="stylesheet" href="css/responsive.css?v=18">
+  <link rel="stylesheet" href="css/tokens.css?v=21">
+  <link rel="stylesheet" href="css/fonts.css?v=21">
+  <link rel="stylesheet" href="css/main.css?v=21">
+  <link rel="stylesheet" href="css/layout.css?v=21">
+  <link rel="stylesheet" href="css/components.css?v=21">
+  <link rel="stylesheet" href="css/animations.css?v=21">
+  <link rel="stylesheet" href="css/responsive.css?v=21">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
@@ -131,43 +131,14 @@
           <div><p class="eyebrow">CONTENIDO DE LAS ESTACIONES</p><h2 id="media-title">Vídeos de demostración</h2></div>
           <span class="subtle-label">Archivos locales o enlaces</span>
         </div>
-        <p class="vision-copy">Elige una estación y prepara hasta dos vídeos para su reproducción automática en secuencia y bucle. Para que el bucle avance al terminar cada clip, usa archivos MP4, WebM u Ogg, o enlaces directos a esos formatos. Los enlaces de YouTube, TikTok e Instagram se abren fuera de la app y no forman parte del bucle automático.</p>
+        <p class="vision-copy">La demo trae preparados enlaces a vídeos genéricos con licencia abierta y selecciona uno según la sección elegida; necesitas internet para reproducirlos. Sustitúyelos aquí por vídeos autorizados de tus productos si los tienes. La cámara estima un rango de edad aproximado, pero no identifica pelo ni barba. Usa MP4, WebM, Ogg o un enlace directo; YouTube, TikTok e Instagram no se reproducen de forma fiable en el bucle.</p>
         <div class="media-controls">
           <label class="media-field" for="media-station">Estación
             <select id="media-station" class="field-select"></select>
           </label>
-          <div class="media-slot">
-            <label class="media-field" for="media-video-1">Vídeo 1 · archivo
-              <input id="media-video-1" class="media-input" type="file" accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogv,.ogg">
-            </label>
-            <label class="media-field" for="media-url-1">o enlace
-              <input id="media-url-1" class="media-input media-url-input" type="url" placeholder="https://..." autocomplete="off">
-            </label>
-            <button class="button button-secondary media-add-url" data-media-url-slot="0" type="button">Preparar enlace</button>
-            <label class="media-field" for="media-audience-1">Asignar este vídeo a
-              <select id="media-audience-1" class="field-select media-audience">
-                <option value="all">Cualquier perfil</option><option value="curly">Pelo rizado</option><option value="straight">Pelo liso</option><option value="short">Pelo corto</option><option value="long">Pelo largo</option><option value="beard">Con barba</option><option value="no-beard">Sin barba</option><option value="under18">Menos de 18</option><option value="18-24">18–24</option><option value="25-34">25–34</option><option value="35-44">35–44</option><option value="45-plus">45 o más</option>
-              </select>
-            </label>
-            <small id="media-name-1">Sin vídeo seleccionado</small>
-          </div>
-          <div class="media-slot">
-            <label class="media-field" for="media-video-2">Vídeo 2 · archivo
-              <input id="media-video-2" class="media-input" type="file" accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogv,.ogg">
-            </label>
-            <label class="media-field" for="media-url-2">o enlace
-              <input id="media-url-2" class="media-input media-url-input" type="url" placeholder="https://..." autocomplete="off">
-            </label>
-            <button class="button button-secondary media-add-url" data-media-url-slot="1" type="button">Preparar enlace</button>
-            <label class="media-field" for="media-audience-2">Asignar este vídeo a
-              <select id="media-audience-2" class="field-select media-audience">
-                <option value="all">Cualquier perfil</option><option value="curly">Pelo rizado</option><option value="straight">Pelo liso</option><option value="short">Pelo corto</option><option value="long">Pelo largo</option><option value="beard">Con barba</option><option value="no-beard">Sin barba</option><option value="under18">Menos de 18</option><option value="18-24">18–24</option><option value="25-34">25–34</option><option value="35-44">35–44</option><option value="45-plus">45 o más</option>
-              </select>
-            </label>
-            <small id="media-name-2">Sin vídeo seleccionado</small>
-          </div>
+          <div id="media-slots" class="media-slots"></div>
         </div>
-        <p id="media-status" class="media-status" role="status" aria-live="polite">Carga contenido opcional para sustituir las composiciones visuales de demostración.</p>
+        <p id="media-status" class="media-status" role="status" aria-live="polite">Hay vídeos genéricos de demostración preparados. Puedes sustituirlos por contenido autorizado de la tienda.</p>
       </section>
 
       <section class="preview-section" aria-labelledby="preview-title">
@@ -213,6 +184,6 @@
   <script>
     if (location.protocol === "file:") document.getElementById("boot-warning").hidden = false;
   </script>
-  <script type="module" src="js/main.js?v=18"></script>
+  <script type="module" src="js/main.js?v=21"></script>
 </body>
 </html>
