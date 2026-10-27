@@ -1,22 +1,16 @@
 import { appState } from "./state.js";
 import { emitEvent } from "./events.js";
 import { $, escapeHTML } from "./utils.js";
-import { estimateAgeRange } from "./age.js";
-
-const TF_URL = "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js";
-const BLAZEFACE_URL = "https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js";
-const COCO_URL = "https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js";
+import { detectFace, estimateAgeRange, loadFaceDetector } from "./age.js";
 
 let stream = null, video = null, canvas = null, context = null;
-let personModel = null, faceModel = null, librariesPromise = null, personModelPromise = null;
+let faceModelReady = false, faceModelPromise = null;
 let rafId = 0, inferenceBusy = false, inferenceFailed = false, lastInferenceAt = 0;
 let personStartedAt = 0, personPresent = false, triggeredThisPresence = false, latestZone = -1;
 let lastAdminNoticeAt = 0, zoneAssignments = [], startToken = 0, lastStatusKey = "";
-let missedDetectionSince = 0, cpuFallbackAttempted = false, inferenceCount = 0;
+let missedDetectionSince = 0;
 let activeTargetStationId = "";
-const MIN_PERSON_CONFIDENCE = 0.20;
 const MIN_FACE_CONFIDENCE = 0.22;
-const MIN_PERSON_AREA = 0.003;
 const MIN_FACE_AREA = 0.0008;
 const INFERENCE_INTERVAL_MS = 220;
 const ZONE_COUNT = 5;
@@ -31,6 +25,8 @@ function status(message, active = false) {
     if (label) label.textContent = message;
     lastStatusKey = message;
   }
+  const presentationStatus = $("#presentation-status");
+  if (presentationStatus && appState.presentationMode) presentationStatus.textContent = message;
   $("#camera-status-dot")?.classList.toggle("is-active", active);
 }
 function metric(id, value) { const el = $(id); if (el) el.textContent = value; }
@@ -38,58 +34,20 @@ function setControls(active) {
   if ($("#camera-start")) $("#camera-start").disabled = active;
   if ($("#camera-stop")) $("#camera-stop").disabled = !active;
 }
-function loadScript(src, test, label, timeoutMs = 22000) {
-  if (test()) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    let settled = false;
-    const finish = error => {
-      if (settled) return;
-      settled = true; clearTimeout(timeout); script.onload = null; script.onerror = null;
-      if (error) { script.remove(); reject(error); } else resolve();
-    };
-    const timeout = setTimeout(() => finish(new Error(`Tiempo agotado al descargar ${label}.`)), timeoutMs);
-    script.src = src; script.async = true; script.crossOrigin = "anonymous";
-    script.onload = () => test() ? finish() : finish(new Error(`${label} se descargó, pero no se inicializó.`));
-    script.onerror = () => finish(new Error(`No se pudo descargar ${label}. Comprueba internet o el bloqueo de CDN.`));
-    document.head.appendChild(script);
-  });
-}
-async function loadPersonModel(onProgress) {
-  if (personModel) return personModel;
-  if (!personModelPromise) {
-    personModelPromise = (async () => {
-      onProgress("Cargando detector complementario de persona…");
-      await loadScript(COCO_URL, () => Boolean(window.cocoSsd), "COCO-SSD");
-      personModel = await window.cocoSsd.load({ base: "lite_mobilenet_v2" });
-      metric("#metric-model", faceModel ? "Rostro + persona" : "Persona");
-      return personModel;
-    })().catch(error => { personModelPromise = null; throw error; });
-  }
-  return personModelPromise;
-}
 async function ensureModels(onProgress) {
-  if (faceModel || personModel) {
-    if (!faceModel && !personModel) throw new Error("No hay un modelo disponible.");
-    return;
+  if (faceModelReady) return;
+  if (!faceModelPromise) {
+    faceModelPromise = (async () => {
+      onProgress("Cargando detector facial local…");
+      await loadFaceDetector();
+      faceModelReady = true;
+      metric("#metric-model", "Rostro local");
+    })().catch(error => {
+      faceModelPromise = null;
+      throw error;
+    });
   }
-  if (!librariesPromise) {
-    librariesPromise = (async () => {
-      onProgress("Descargando motor de IA…");
-      await loadScript(TF_URL, () => Boolean(window.tf), "TensorFlow.js");
-      await window.tf.ready();
-      // BlazeFace es más ligero: permite empezar a detectar rostros sin esperar al modelo de cuerpo.
-      onProgress("Preparando detección rápida de rostro…");
-      try {
-        await loadScript(BLAZEFACE_URL, () => Boolean(window.blazeface), "BlazeFace");
-        faceModel = await window.blazeface.load({ maxFaces: 5 });
-        metric("#metric-model", "Rostro (rápido)");
-      } catch (error) { console.warn("BlazeFace no disponible; se usará COCO-SSD.", error); }
-      if (!faceModel) await loadPersonModel(onProgress);
-      if (!faceModel && !personModel) throw new Error("No se pudo cargar ningún modelo. Comprueba la conexión y que la red permita jsdelivr.net.");
-    })().catch(error => { librariesPromise = null; throw error; });
-  }
-  return librariesPromise;
+  return faceModelPromise;
 }
 function buildZoneSelectors() {
   const root = $("#zone-selects"); if (!root) return;
@@ -149,7 +107,9 @@ export function initializeCameraControls() {
     try { localStorage.setItem(CONFIDENCE_STORAGE_KEY, String(activationConfidence)); }
     catch (error) { console.error("No se pudo guardar el umbral de confianza:", error); status("No se pudo guardar el umbral de confianza en este navegador."); }
   });
-  $("#camera-start")?.addEventListener("click", startCamera);
+  $("#camera-start")?.addEventListener("click", () => {
+    window.dispatchEvent(new CustomEvent("beautytech:camera-consent-requested"));
+  });
   $("#camera-stop")?.addEventListener("click", () => stopCamera());
   video = $("#camera-preview"); canvas = $("#camera-overlay"); context = canvas?.getContext("2d") || null;
 }
@@ -181,24 +141,27 @@ export async function startCamera() {
     if (token !== startToken) { acquiredStream.getTracks().forEach(track => track.stop()); return; }
     stream = acquiredStream; video.srcObject = stream; await video.play();
     personStartedAt = 0; personPresent = false; triggeredThisPresence = false; latestZone = -1;
-    lastInferenceAt = 0; inferenceBusy = false; inferenceFailed = false; missedDetectionSince = 0; cpuFallbackAttempted = false; inferenceCount = 0;
-    status("Cámara activa. Cargando el detector ligero…", true);
+    lastInferenceAt = 0; inferenceBusy = false; inferenceFailed = false; missedDetectionSince = 0;
+    status("Cámara activa. Cargando el detector facial local…", true);
     try { await ensureModels(message => { if (token === startToken && stream) status(message, true); }); }
     catch (error) {
       if (token !== startToken || !stream) return false;
       console.error("Carga de IA fallida:", error);
       stopCamera(false);
-      status(`La cámara funciona, pero no se pudo cargar la IA: ${error?.message || "error de descarga"}. Detén la cámara y vuelve a intentarlo.`, true);
+      status(`La cámara funciona, pero no se pudo cargar el modelo local: ${error?.message || "error de carga"}.`, true);
       metric("#metric-model", "Error de carga"); return false;
     }
     if (token !== startToken || !stream) return false;
-    status(`IA lista (${faceModel ? "rostro rápido" : "persona"}${personModel ? " + detector de persona" : ""}). Ponte en una zona y permanece un instante.`, true);
-    metric("#metric-model", faceModel && personModel ? "Rostro + persona" : faceModel ? "Rostro rápido" : "Persona");
+    status("Detector local listo. Ponte frente a la cámara y permanece un instante.", true);
+    metric("#metric-model", "Rostro local");
     rafId = requestAnimationFrame(now => scanFrame(now, token));
     return true;
   } catch (error) {
     if (token !== startToken) return false;
-    console.error("No se pudo iniciar la cámara:", error); stopCamera(false);
+    if (!["NotAllowedError", "PermissionDeniedError", "NotFoundError", "DevicesNotFoundError", "NotReadableError", "TrackStartError"].includes(error?.name)) {
+      console.error("No se pudo iniciar la cámara:", error);
+    }
+    stopCamera(false);
     const detail = ["NotAllowedError", "PermissionDeniedError"].includes(error?.name)
       ? "Permiso denegado. Permite el acceso a la cámara desde el icono junto a la dirección."
       : ["NotFoundError", "DevicesNotFoundError"].includes(error?.name)
@@ -225,25 +188,7 @@ function drawOverlay(detection) {
   context.restore();
 }
 async function detectPresence() {
-  // Preferimos rostro: suele responder mejor cuando la cámara está cerca del visitante.
-  if (faceModel) {
-    const faces = await faceModel.estimateFaces(video, false);
-    const normalized = faces.map(face => {
-      const topLeft = Array.isArray(face.topLeft) ? face.topLeft : face.topLeft?.arraySync?.();
-      const bottomRight = Array.isArray(face.bottomRight) ? face.bottomRight : face.bottomRight?.arraySync?.();
-      const probability = Array.isArray(face.probability) ? Number(face.probability[0]) : Number(face.probability?.[0] ?? 0.8);
-      if (!topLeft || !bottomRight) return null;
-      return { bbox: [Number(topLeft[0]), Number(topLeft[1]), Number(bottomRight[0]) - Number(topLeft[0]), Number(bottomRight[1]) - Number(topLeft[1])], score: Number.isFinite(probability) ? probability : 0.8, kind: "face" };
-    }).filter(face => face && face.score >= MIN_FACE_CONFIDENCE && face.bbox.every(Number.isFinite));
-    if (normalized.length) return normalized.sort((a,b) => b.score - a.score)[0];
-  }
-  if (personModel) {
-    const predictions = await personModel.detect(video, 5, 0.20);
-    const people = predictions.filter(item => item.class === "person" && item.score >= MIN_PERSON_CONFIDENCE)
-      .map(item => ({ bbox: item.bbox, score: item.score, kind: "person" })).sort((a,b) => b.score-a.score);
-    if (people.length) return people[0];
-  }
-  return null;
+  return detectFace(video);
 }
 function resetPresence() {
   if (personPresent && triggeredThisPresence && latestZone >= 0) {
@@ -268,14 +213,14 @@ function scanFrame(now, token) {
         drawOverlay(null);
         if (!missedDetectionSince) missedDetectionSince = performance.now();
         if (performance.now() - missedDetectionSince > 850) resetPresence();
-        status(detection ? `Confianza inferior al mínimo (${Math.round(activationConfidence * 100)}%).` : personPresent ? "Detección intermitente; mantén la posición…" : "Buscando rostro o persona… mejora la luz y acércate un poco.", true);
+        status(detection ? `Confianza inferior al mínimo (${Math.round(activationConfidence * 100)}%).` : personPresent ? "Detección intermitente; mantén la posición…" : "Buscando rostro… mejora la luz y acércate un poco.", true);
         return;
       }
       missedDetectionSince = 0; drawOverlay(detection);
       const [x, , w, h] = detection.bbox;
       const areaRatio = Math.max(0, Math.min(1, (w * h) / Math.max(1, video.videoWidth * video.videoHeight)));
-      if (areaRatio < (detection.kind === "face" ? MIN_FACE_AREA : MIN_PERSON_AREA)) {
-        resetPresence(); status(`${detection.kind === "face" ? "Rostro" : "Persona"} detectado, pero ocupa poco espacio. Acércate a la cámara.`, true); return;
+      if (areaRatio < MIN_FACE_AREA) {
+        resetPresence(); status("Rostro detectado, pero ocupa poco espacio. Acércate a la cámara.", true); return;
       }
       const zone = Math.max(0, Math.min(ZONE_COUNT - 1, Math.floor((1 - ((x + w / 2) / video.videoWidth)) * ZONE_COUNT)));
       const selectedStationId = $("#camera-station")?.value || "";
@@ -293,14 +238,9 @@ function scanFrame(now, token) {
       if (station && station.state !== "cooldown" && dwellMs >= Number(station.dwellMs ?? appState.config.settings.attentionThresholdMs) && !triggeredThisPresence) {
         void onSustainedPresence({ confidence: detection.score, areaRatio, dwellMs, zone, station, kind: detection.kind, token });
       }
-    }).catch(async error => {
+    }).catch(error => {
       if (!stream || token !== startToken) return;
       console.error("Error de inferencia:", error);
-      if (!cpuFallbackAttempted && window.tf?.setBackend) {
-        cpuFallbackAttempted = true;
-        try { status("Adaptando la IA a este equipo…", true); await window.tf.setBackend("cpu"); await window.tf.ready(); status("IA adaptada. Continuando detección…", true); return; }
-        catch (backendError) { console.warn("No se pudo cambiar el backend:", backendError); }
-      }
       inferenceFailed = true; status(`La cámara funciona, pero la IA ha fallado: ${error?.message || "error de inferencia"}. Detén y vuelve a activar la cámara.`);
     }).finally(() => { if (token === startToken) inferenceBusy = false; });
   }
@@ -316,11 +256,12 @@ async function onSustainedPresence({ confidence, areaRatio, dwellMs, zone, stati
   if (!station.enabled) { status(`${station.name} está desactivada.`, true); triggeredThisPresence = true; return; }
   triggeredThisPresence = true;
   emitEvent("entry");
-  emitEvent("attention", station.id, { proximity: Math.min(0.95, 0.45 + areaRatio * 2.5), dwellMs, orientation: null, confidence, zone: zone + 1, source: kind === "face" ? "blazeface-face-zone-detection" : "coco-ssd-person-zone-detection" });
+  emitEvent("attention", station.id, { proximity: Math.min(0.95, 0.45 + areaRatio * 2.5), dwellMs, orientation: null, confidence, zone: zone + 1, source: "face-api-local-detection" });
   status(`Presencia detectada por IA. Activando ${station.name}.`, true);
   if (kind === "face") {
     void estimateAgeRange(video).then(ageGroup => {
       if (!stream || token !== startToken || appState.mode !== "public" || !personPresent || activeTargetStationId !== station.id) return;
+      metric("#metric-model", "Rostro + edad local");
       window.dispatchEvent(new CustomEvent("beautytech:age-estimated", { detail: { stationId: station.id, ageGroup } }));
     }).catch(error => {
       if (!stream || token !== startToken) return;

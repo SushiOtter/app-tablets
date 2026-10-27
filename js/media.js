@@ -1,6 +1,6 @@
 import { appState } from "./state.js";
 import { $, escapeHTML } from "./utils.js";
-import { renderDevices } from "./panels.js?v=21";
+import { renderDevices } from "./panels.js?v=24";
 
 const objectUrls = new Set();
 let selectedStationId = "";
@@ -8,12 +8,16 @@ const MEDIA_STORAGE_KEY = "beauty-tech-retail-media-urls-v1";
 const MEDIA_SLOT_COUNT = 6;
 const DEFAULT_DEMO_MEDIA = {
   cosmetics: {
-    name: "Demostración de cosmética · Sha'Boris · CC BY-SA 4.0",
-    url: "https://upload.wikimedia.org/wikipedia/commons/3/30/Cosmetics.webmhd.webm"
+    name: "Demostración de cosmética · Sha'Boris · CC BY-SA 4.0 · local",
+    url: "./assets/videos/cosmetics-demo.mp4",
+    type: 'video/mp4; codecs="av01.0.05M.08"',
+    fallbacks: [{ url: "./assets/videos/cosmetics-demo.webm", type: 'video/webm; codecs="vp8, vorbis"' }]
   },
   hair: {
-    name: "Corte de cabello · Blackgirlmighty · CC0",
-    url: "https://upload.wikimedia.org/wikipedia/commons/f/f3/Hair_cutting_in_Botswana.webm"
+    name: "Cuidado capilar · Blackgirlmighty · CC0 · local",
+    url: "./assets/videos/haircare-demo.mp4",
+    type: 'video/mp4; codecs="av01.0.05M.08"',
+    fallbacks: [{ url: "./assets/videos/haircare-demo.webm", type: 'video/webm; codecs="vp8, vorbis"' }]
   }
 };
 const MEDIA_AUDIENCES = [

@@ -1,104 +1,69 @@
 # Beauty Tech Retail Experience
 
-**Versión 21.** Prototipo navegable para presentar una experiencia de retail de belleza con cinco estaciones, un panel de administración y una vista pública separada.
+**Versión 24.** Experiencia local para cinco estaciones de belleza, con consentimiento previo y procesamiento de cámara en el navegador.
 
-Prototipo web local para presentar una experiencia de recomendación automática en una tienda de belleza. Incluye cinco estaciones comerciales, una pantalla de entrada/sensor conceptual, administración, modo público y detección experimental de personas mediante cámara.
+## Inicio rápido en Windows
 
-## Arranque rápido en Windows
+1. Extrae el proyecto completo.
+2. Ejecuta `INICIAR-DEMO.bat`, o desde PowerShell en esta carpeta: `py .\iniciar_demo.py`.
+3. Usa la dirección local que se abre; deja la ventana del servidor activa.
 
-1. Extrae el ZIP completo en una carpeta.
-2. Haz doble clic en `INICIAR-DEMO.bat`.
-3. Se abrirá la dirección local que muestra la ventana del servidor. Déjala abierta durante la presentación.
-4. Mantén abierta la ventana negra del servidor mientras utilices la demo.
+No requiere Node, paquetes Python, claves ni conexión a internet para la detección local y los vídeos incluidos. No abras `index.html` con doble clic: la cámara y los módulos necesitan el servidor local de `127.0.0.1`.
 
-Se recomienda Python 3; no requiere Node.js ni instalación de paquetes. No abras `index.html` directamente: los módulos necesitan un servidor local. El servidor solo escucha en el equipo (`127.0.0.1`).
+## Recorrido
 
-## Cómo hacer la demostración
+1. En la pantalla inicial, selecciona una sección y pulsa **Iniciar experiencia**.
+2. Lee el aviso. **Aceptar y activar cámara** solicita el permiso nativo del navegador; **No aceptar · Volver** vuelve sin solicitarlo ni encenderla.
+3. Tras aceptar, se carga el detector facial local y aparece el estado de escaneo. Una presencia sostenida muestra una franja aproximada de edad, sugerencias generales y el vídeo local de la sección.
+4. Se puede corregir la franja en el selector de recomendaciones. El botón **Volver al inicio** o Escape detiene la cámara y devuelve al inicio.
+5. Si se rechaza el permiso del navegador, se muestran acciones para reintentar, volver al inicio o iniciar una demostración guiada sin cámara. Esta última se identifica como simulación y no estima edad.
 
-1. La entrada normal es el modo trabajador: selecciona una sección activa y pulsa **Iniciar experiencia**. La primera sección activa aparece preseleccionada.
-2. Permite el acceso a la cámara. La tablet entra en pantalla completa y espera; cuando detecta presencia, muestra automáticamente el contenido en bucle. Al alejarse la persona, vuelve a esperar. **Salir · Administración** detiene la cámara y abre la configuración.
-3. Para probar el contenido no hace falta cargar nada: la demo prepara automáticamente un enlace a un vídeo genérico de cosmética o cabello según la sección elegida y lo reproduce al detectar presencia. Se necesita internet para obtenerlo de Wikimedia Commons. En «Vídeos de demostración» puedes sustituirlo por contenido autorizado de tus productos. La cámara estima un rango de edad aproximado para las sugerencias, pero no reconoce características del pelo ni barba. YouTube, TikTok e Instagram no son aptos para el bucle automático.
-4. Si no puedes usar una cámara durante la presentación, **Probar estación** y **Iniciar demostración guiada** simulan el flujo; la pantalla indica que es una simulación.
+## Funcionalidad
 
-## Funciones implementadas
+- Cinco estaciones configurables y contenido local de muestra.
+- Modos trabajador, administración y presentación a pantalla completa.
+- Consentimiento explícito antes de solicitar el acceso a la cámara.
+- Detección facial y rango de edad calculados en el dispositivo con `@vladmandic/face-api` 1.7.15. Código y pesos necesarios incluidos.
+- Rango corregible: menos de 18, 18–24, 25–34, 35–44 y 45 o más.
+- Recomendaciones de ejemplo generales por rango; no son diagnóstico ni valoración de la piel.
+- Dos vídeos locales de muestra con licencia abierta: MP4/AV1 preferido y WebM/VP8 como alternativa cuando el navegador no admita AV1; pueden sustituirse por archivos autorizados de la tienda.
+- Modos de simulación manual/guiada sin cámara, claramente identificados como simulación.
+- Cinco zonas de cámara configurables, ajuste de confianza y diseño responsive.
 
-- Cinco estaciones editables con nombre, descripción, familia, campaña, tipo de contenido, estado y tiempos individuales de permanencia y espera.
-- Guardado local de configuración, zonas de cámara, confianza mínima y duración de la demostración; **Restaurar valores iniciales** restaura preferencias y estaciones.
-- Modo público sin controles administrativos, sensor ni códigos técnicos.
-- Prueba manual individual, prueba rápida y recorrido guiado secuencial (12–45 s por estación), completamente utilizable sin cámara.
-- Se incluyen dos vídeos genéricos con licencias abiertas. La aplicación asigna automáticamente la demostración de cosmética a las estaciones de cosmética y la de corte a las secciones capilares. Los vídeos se reproducen en bucle mientras dura la presencia; los trabajadores pueden sustituirlos por contenido autorizado desde Administración.
-- Configuración inicial de estaciones en `data/contenido.json`.
-- Motor de eventos `beautytech:event` y estados `idle`, `attention`, `playing`, `cooldown` y `disabled`.
-- Recomendación demostrativa de dos piezas por estación, con transición y regreso al reposo.
-- Detección experimental con BlazeFace/TensorFlow.js y COCO-SSD. Al detectar un rostro, carga @vladmandic/face-api en segundo plano y estima localmente un rango de edad aproximado para priorizar vídeos y sugerencias generales.
-- Modo presentación a pantalla completa: una selección de sección y un toque inician la cámara y el modo público. Solo se ve esa sección, una indicación de espera cuando no hay nadie, y el botón de salida arriba a la derecha (también Escape). Al detectar presencia se muestran los clips/vídeos en bucle; el ciclo se detiene al perder presencia.
-- Perfil de escenario opcional para probar etiquetas manuales de textura y longitud del pelo o vello facial. La cámara no los infiere, ni determina género o necesidades.
-- Cada vídeo se puede asignar a un perfil orientativo; con un escenario elegido, la reproducción prioriza vídeos coincidentes y añade los marcados para cualquier perfil.
-- Reproducción de vídeos MP4, WebM u Ogg en secuencia con avance al final real del vídeo y repetición en bucle mientras dura la presencia. Para una presentación fiable, prepara los vídeos locales o enlaces directos compatibles con antelación.
-- Recomendaciones orientativas por rangos: menos de 18, 18–24, 25–34, 35–44 y 45 o más. No se muestra una edad exacta ni se utilizan predicciones de género.
-- Cinco zonas asignables y umbral de confianza ajustable. La cámara detecta presencia aproximada, no atención ni interés.
-- El lanzador Python elige un puerto libre si el puerto 8000 está ocupado.
-- Diseño responsive y respeto de preferencias de movimiento reducido.
+## Privacidad y límites
 
-## Límites importantes
+- No se activa la cámara antes de aceptar el aviso. El navegador puede denegar el permiso y la experiencia ofrece opciones de salida.
+- Fotogramas y rango estimado se procesan en memoria local: no se guardan ni se envían a terceros ni a un servidor.
+- La edad estimada puede ser inexacta y **no verifica la edad**. La edad no determina las necesidades de la piel. No se presenta ni se usa la salida de género del modelo.
+- La detección requiere ver un rostro; no estima edad si solo ve un cuerpo. No reconoce identidad, mirada, barba o características del cabello.
+- Los vídeos de ejemplo son genéricos, no representan productos reales. La franja cambia las sugerencias; la selección de vídeo actual depende de la sección.
+- La interfaz no usa fuentes web: `css/fonts.css` toma Segoe UI/Georgia disponibles en el sistema. Los iconos son SVG incluidos en `assets/icons/`.
+- En Administración se puede introducir voluntariamente una URL externa de vídeo. Ese uso opcional contacta al host elegido y necesita internet; no es necesario para la demo y nunca recibe imágenes de cámara.
+- No se ha probado una cámara física ni una tablet Android real. El comportamiento de GPU, permisos y codecs debe confirmarse en el dispositivo de destino.
+- El servidor Python enlaza solo a `127.0.0.1`. En Android, una web servida por HTTP desde otro equipo de la red normalmente no es un origen seguro para cámara; usa un origen HTTPS de confianza o ejecuta el servicio localmente en la tablet.
+- Para un despliegue en tienda, revisa accesibilidad, rendimiento, consentimiento, privacidad, obligaciones legales y los derechos de cualquier contenido que añadas.
 
-- La estimación visual de edad puede ser inexacta y no representa la edad real. El rango solo selecciona sugerencias generales; la edad no determina las necesidades de la piel.
-- La cámara solo clasifica presencia y estima un rango de edad orientativo; no detecta género, barba, longitud o textura del pelo, ni determina necesidades. Etiquetas como pelo liso/rizado o barba se asignan manualmente y no activan una detección visual automática.
-- La IA no identifica personas, no detecta la mirada y no confirma interés real. No realiza reconocimiento de identidad ni usa predicciones de género.
-- La zona se calcula dividiendo la imagen en cinco franjas horizontales. El empleado debe asociarlas manualmente a las estaciones visibles de izquierda a derecha. No es una calibración física de la tienda.
-- La presencia sostenida y el tamaño de la detección son aproximaciones, no una medición fiable de distancia o atención.
-- El código no guarda ni envía fotogramas. La inferencia y el rango estimado se procesan en el navegador; el rango permanece solo en la vista pública mientras está abierta y no se guarda ni se envía a un servidor. El navegador necesita permiso explícito para activar la cámara.
-- Los vídeos incluidos son ejemplos genéricos, no anuncios ni productos reales de la tienda. La edad estimada adapta las sugerencias de producto, pero no selecciona un clip distinto por edad. La cámara no clasifica pelo, barba ni textura; para personalizar vídeos según esas características hace falta integrar y validar un modelo dedicado y disponer de clips adecuados.
-- No incluye comunicación entre tablets físicas, backend, modo kiosco ni analítica de producción.
-- Atribución de los vídeos de muestra: “Cosmetics.webmhd.webm”, Sha'Boris, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Cosmetics.webmhd.webm); “Hair cutting in Botswana.webm”, Blackgirlmighty, [CC0](https://creativecommons.org/publicdomain/zero/1.0/), [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Hair_cutting_in_Botswana.webm).
-- La cámara usa BlazeFace/TensorFlow.js desde jsDelivr y necesita permiso, navegador compatible e internet en el primer arranque. La IA disponible detecta rostro/persona y puede estimar un rango de edad orientativo en segundo plano; no reconoce género, barba, longitud ni textura del pelo.
-- El recorrido guiado es una simulación para presentar el flujo; no representa una detección real. Para un despliegue real hay que revisar accesibilidad, rendimiento, dispositivos, consentimiento/información, base jurídica y obligaciones de privacidad con los responsables correspondientes.
+## Recursos y licencias
 
-## Diagnóstico si algo no aparece
+| Recurso | Versión | Licencia | Descarga y copia incluida | Alternativas evaluadas / elección |
+|---|---|---|---|---|
+| `@vladmandic/face-api` (detección y estimación) | 1.7.15 | MIT; copia de `LICENSE` junto a la biblioteca | Paquete oficial del autor en [npm 1.7.15](https://www.npmjs.com/package/@vladmandic/face-api/v/1.7.15); `vendor/face-api/face-api.js` | Se descargaron e inspeccionaron `face-api.js` 0.22.2 (MIT) y `@vladmandic/human` 3.3.6 (MIT). El paquete antiguo no incluía pesos de modelo; Human era más grande y no empaquetaba un modelo de edad listo para este flujo. Se eligió el bundle compacto y se probó su carga desde disco. |
+| TensorFlow.js (incluido en el bundle del navegador) | 4.22.0 | Apache-2.0; copia local | Código incluido en el bundle oficial anterior; [licencia del repositorio oficial `tensorflow/tfjs`](https://github.com/tensorflow/tfjs/blob/tfjs-v4.22.0/LICENSE); `vendor/face-api/TENSORFLOW-LICENSE` | Se mantiene local, junto con el bundle de inferencia; no se carga desde CDN. |
+| TinyFaceDetector y AgeGenderNet (pesos) | Incluidos en 1.7.15 | MIT, distribuidos dentro del paquete anterior | Manifiestos y pesos del mismo paquete npm; `models/face-api/` | Las alternativas inspeccionadas no proporcionaban aquí pesos de edad listos para uso local. |
+| Recomendaciones por edad | 24 | Lógica y textos de ejemplo del proyecto | `js/products.js` y `data/contenido.json`; sin descarga externa | Reglas locales por rango, editables; no se envía la imagen ni se consulta una API. |
+| Muestra de cosmética (`cosmetics-demo.mp4`, alternativa `.webm`) | AV1 MP4 + VP8 WebM | CC BY-SA 4.0 | Sha'Boris, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Cosmetics.webmhd.webm); archivos locales en `assets/videos/` | Se probaron WebM/VP8 y MP4/H.264; el Chromium integrado no decodificó WebM, mientras que MP4/AV1 sí se reprodujo. H.264 no se incluyó por sus condiciones de patentes; WebM/VP8 queda como alternativa a confirmar en el dispositivo final. |
+| Muestra de cabello (`haircare-demo.mp4`, alternativa `.webm`) | AV1 MP4 + VP8 WebM | CC0 1.0 | Blackgirlmighty, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Hair_cutting_in_Botswana.webm); archivos locales en `assets/videos/` | AV1 se probó reproduciendo el archivo; WebM/VP8 queda incluido para dispositivos que lo admitan, pero no se pudo validar en el Chromium integrado. La fuente CC0 permite su reutilización comercial. |
+| Fuentes e iconos | Dependientes del sistema / SVG del proyecto | Segoe UI y Georgia dependen de la licencia del sistema; SVG propios del proyecto | Fuentes del sistema y `assets/icons/`; no se descarga una fuente web | Se evitó Google Fonts y paquetes de iconos remotos para que la interfaz no dependa de internet. |
 
-- Si se abre el archivo directamente, la página muestra un aviso para iniciar el servidor local.
-- Si aparece “No se pudo cargar la configuración”, comprueba que `data/contenido.json` está dentro de la carpeta y vuelve a iniciar el lanzador.
-- Si falla la IA, prueba primero **Probar recomendación**. La detección de presencia y el estimador de edad requieren conexión para descargar bibliotecas y pesos; la interfaz y la simulación no dependen de esa conexión.
-- La cámara necesita permiso y el navegador debe permitirla en localhost. Los modelos requieren conexión y acceso a `cdn.jsdelivr.net`; la UI y la demostración guiada funcionan sin conexión externa.
+La licencia MIT del paquete está en `vendor/face-api/LICENSE`; la licencia Apache-2.0 del componente TensorFlow.js incluido está en `vendor/face-api/TENSORFLOW-LICENSE`. El servidor local admite solicitudes HTTP por rangos de bytes, necesarias para que el navegador pueda reproducir y buscar en los vídeos. En uso comercial del vídeo CC BY-SA, conserva la atribución y cumple las condiciones de esa licencia; el archivo CC0 no requiere atribución, aunque aquí se conserva su autoría como referencia. Sustituye los vídeos solo por contenido con derechos adecuados.
 
-## Estructura
+## Diagnóstico y pruebas
 
-- `index.html`: estructura semántica y vistas.
-- `css/`: estilos, variables, componentes, responsive y animaciones.
-- `js/main.js`: arranque de la aplicación.
-- `js/state.js`: estado global.
-- `js/configuration.js`: carga, edición y persistencia local de configuración.
-- `js/events.js`: motor de eventos y ciclo de recomendación.
-- `js/panels.js`: renderizado de pantallas administrativas y públicas.
-- `js/admin.js`: administración y cambio de modo.
-- `js/camera.js`, `js/detection.js`, `js/age.js`: cámara, detección experimental, estimación orientativa de edad y métricas de diagnóstico.
-- `js/products.js`: sugerencias demostrativas para cada rango de edad.
-- `data/contenido.json`: contenido y parámetros operativos.
-- `iniciar_demo.py`, `INICIAR-DEMO.bat`: arranque local en Windows.
-
-## Qué se guarda y privacidad
-
-La configuración, las zonas asignadas, el umbral de confianza, la duración del recorrido y los enlaces de vídeo se guardan en `localStorage` de este navegador. No hay cuentas, backend ni sincronización. Los archivos de vídeo locales solo viven en memoria y deben volver a seleccionarse tras recargar; no se suben. Los enlaces de YouTube, TikTok e Instagram se abren en el servicio original fuera de la app; sus páginas pueden solicitar cookies o inicio de sesión según sus propias políticas. Los fotogramas y el rango de edad no se guardan ni se envían a un servidor: el procesamiento ocurre en el navegador y el rango solo permanece en memoria mientras está abierta la vista pública. La aplicación sí descarga bibliotecas y pesos de modelos desde `cdn.jsdelivr.net`.
-
-La división de la imagen en cinco franjas es solo una aproximación: no prueba que una persona mire una tablet ni representa necesariamente la geometría real de la tienda. Un despliegue real puede requerir calibración, sensores o cámaras adicionales y una revisión independiente de las obligaciones legales y de privacidad.
-
-## Limitaciones y problemas frecuentes
-
-- No se probó una cámara física ni la descarga/inferencia del modelo en este entorno. El navegador, dispositivo, permiso y red afectan esa función; la demostración guiada es la alternativa fiable.
-- Si la cámara no inicia, comprueba permisos y cierra aplicaciones que la estén usando. Si falla la descarga del modelo, comprueba la conexión y prueba el recorrido guiado.
-- Si la configuración no carga, inicia la demo mediante el `.bat` y confirma que `data/contenido.json` existe.
-- No hay conexión entre tablets, backend, autenticación, modo kiosco ni analítica de producción.
-
-## Verificación realizada
-
-En el navegador integrado se comprobó la carga de cinco estaciones, persistencia de cambios tras recargar, activación de contenido en simulación manual, entrada/parada/repetición del modo guiado, etiquetado de las modalidades, exclusión del sensor y códigos técnicos del modo público, recuperación tras un vídeo inválido, respuesta HTTP correcta del favicon, ausencia de errores JavaScript y ausencia de desbordamiento horizontal móvil. El editor no detectó errores en los módulos modificados.
-
-No se probó cámara física, la descarga real de modelos ni un archivo de vídeo concreto.
-
-### Si la IA dice que no detecta a nadie
-
-- Asegúrate de que la vista previa muestra tu imagen en directo y no está negra/congelada.
-- Ponte frente a la cámara con buena iluminación; al principio prueba mostrando cabeza y torso, no solo la cara ni una silueta muy pequeña.
-- Esta versión prioriza BlazeFace (rostro) y carga COCO-SSD como detector complementario. Ajusta el umbral de confianza y los segundos de permanencia desde Administración. Un rostro detectado significa presencia aproximada, no identidad ni interés real.
-- Si indica que no puede descargar un modelo, comprueba conexión a internet y que la red no bloquee `cdn.jsdelivr.net`; pulsa Detener cámara y vuelve a activarla.
-- Si la cámara se ve pero no detecta nada, prueba Chrome o Edge actualizados, cierra aplicaciones que puedan estar usando la cámara, mejora la iluminación y evita que la cara quede muy pequeña. Revisa los indicadores de confianza y latencia. Si la detección falla por incompatibilidad del backend gráfico, la app intenta cambiar a CPU; puede ser más lenta.
+- Si la cámara no inicia, revisa permisos del navegador, conexión física de la cámara y cierra aplicaciones que la estén usando. Si rechazas el permiso, puedes volver al inicio o usar la simulación sin cámara.
+- Si no carga el modelo local, comprueba que `vendor/face-api/` y `models/face-api/` estén incluidos en la carpeta.
+- Los modelos y vídeos incluidos no usan CDN. Solo un enlace externo añadido manualmente puede generar solicitudes de red.
+- Verificado en Windows con el Chromium integrado de Electron (Chrome 150): arranque con `python .\iniciar_demo.py`, detección y estimación local con una cara vectorial sintética, carga de ambos modelos, mapeo de los cinco rangos, actualización manual de recomendaciones y reproducción de ambos MP4/AV1. La cara sintética prueba la conexión del flujo, no la precisión con personas reales.
+- Se probó rechazar el consentimiento sin cargar modelos, el permiso de cámara denegado, reintentar con una cámara simulada y volver al inicio. También se inició y detuvo la simulación guiada sin activar la cámara.
+- En el recorrido de prueba no hubo solicitudes externas, respuestas HTTP 4xx, solicitudes fallidas ni errores/avisos de consola. Los rangos HTTP se validaron con respuestas 206 y 416; la inferencia mostró 27 ms tras cargar los modelos.
+- Se capturaron e inspeccionaron las vistas de bienvenida y resultado en 1280×800 y 390×844; no hubo desbordamiento horizontal. AV1 se reprodujo; el Chromium integrado no pudo decodificar WebM/VP8, así que esa alternativa queda pendiente de prueba en Chrome/Edge nativos.
+- No se certificó cámara física, tablet Android real ni todas las combinaciones de GPU/codec. Confirma la cámara, el permiso y el respaldo WebM en el dispositivo de tienda.

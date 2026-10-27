@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#1b1816">
   <title>Beauty Tech — Experiencia de retail inteligente</title>
   <link rel="icon" href="assets/icons/beauty-tech.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/tokens.css?v=21">
-  <link rel="stylesheet" href="css/fonts.css?v=21">
-  <link rel="stylesheet" href="css/main.css?v=21">
-  <link rel="stylesheet" href="css/layout.css?v=21">
-  <link rel="stylesheet" href="css/components.css?v=21">
-  <link rel="stylesheet" href="css/animations.css?v=21">
-  <link rel="stylesheet" href="css/responsive.css?v=21">
+  <link rel="stylesheet" href="css/tokens.css?v=24">
+  <link rel="stylesheet" href="css/fonts.css?v=24">
+  <link rel="stylesheet" href="css/main.css?v=24">
+  <link rel="stylesheet" href="css/layout.css?v=24">
+  <link rel="stylesheet" href="css/components.css?v=24">
+  <link rel="stylesheet" href="css/animations.css?v=24">
+  <link rel="stylesheet" href="css/responsive.css?v=24">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
@@ -38,14 +38,46 @@
     <section id="worker-view" class="worker-view" aria-labelledby="worker-title">
       <p class="eyebrow">EXPERIENCIA EN TIENDA</p>
       <h1 id="worker-title">Prepara la tablet<br><em>en un solo paso.</em></h1>
-      <p class="worker-copy">Elige qué sección quieres mostrar y pulsa iniciar. La tablet esperará a que alguien se acerque y empezará automáticamente.</p>
+      <p class="worker-copy">Elige qué sección quieres mostrar. Antes de activar la cámara te explicaremos qué se analiza y podrás continuar sin conceder permiso.</p>
       <div class="worker-controls">
         <label for="worker-station">Sección que quieres mostrar
           <select id="worker-station" class="field-select"></select>
         </label>
         <button class="button button-primary" id="worker-start" type="button">Iniciar experiencia</button>
       </div>
-      <p class="worker-note">La primera vez tendrás que permitir el acceso a la cámara. Para detener la experiencia, pulsa «Salir · Administración».</p>
+      <p class="worker-note">La cámara es opcional: antes de pedir permiso verás qué se procesa y podrás rechazarlo.</p>
+    </section>
+
+    <section id="camera-consent-view" class="worker-view camera-flow-view" aria-labelledby="camera-consent-title" hidden>
+      <p class="eyebrow">TU PRIVACIDAD · CÁMARA OPCIONAL</p>
+      <h1 id="camera-consent-title">Tú decides<br><em>si activar la cámara.</em></h1>
+      <p class="worker-copy">La cámara se usa únicamente para detectar un rostro y, si lo encuentra, calcular una franja de edad orientativa para sugerir productos. La estimación puede equivocarse y no confirma tu edad.</p>
+      <div class="privacy-card">
+        <strong>Procesamiento local en este dispositivo</strong>
+        <ul>
+          <li>El navegador no envía ni guarda imágenes ni el rango estimado.</li>
+          <li>La cámara solo se activa después de pulsar «Aceptar y activar».</li>
+          <li>Puedes parar la cámara o salir en cualquier momento.</li>
+          <li>Si no aceptas, no se activa la cámara; puedes volver al inicio.</li>
+        </ul>
+      </div>
+      <div class="worker-flow-actions">
+        <button class="button button-primary" id="camera-consent-accept" type="button">Aceptar y activar cámara</button>
+        <button class="button button-secondary" id="camera-consent-decline" type="button">No aceptar · Volver</button>
+      </div>
+      <p class="worker-note">El permiso del navegador se solicitará después de tu aceptación. La estimación de edad es aproximada y solo adapta sugerencias generales.</p>
+    </section>
+
+    <section id="camera-error-view" class="worker-view camera-flow-view" aria-labelledby="camera-error-title" hidden>
+      <p class="eyebrow">CÁMARA NO DISPONIBLE</p>
+      <h1 id="camera-error-title">No se ha iniciado<br><em>la detección.</em></h1>
+      <p class="worker-copy" id="camera-error-copy" role="status" aria-live="polite">No se ha concedido acceso a la cámara.</p>
+      <div class="worker-flow-actions">
+        <button class="button button-primary" id="camera-error-retry" type="button">Volver a intentar</button>
+        <button class="button button-secondary" id="camera-error-demo" type="button">Probar demostración sin cámara</button>
+        <button class="button button-quiet" id="camera-error-home" type="button">Volver al inicio</button>
+      </div>
+      <p class="worker-note">La demostración sin cámara está identificada como simulación y no estima edad ni detecta presencia.</p>
     </section>
 
     <section id="admin-view" class="admin-view" aria-labelledby="admin-title" hidden>
@@ -104,7 +136,7 @@
           <div><p class="eyebrow">DETECCIÓN LOCAL EXPERIMENTAL</p><h2 id="vision-title">Prueba con cámara</h2></div>
           <span class="subtle-label">Procesamiento en este navegador</span>
         </div>
-        <p class="vision-copy">La cámara solo detecta presencia. Los perfiles de ejemplo y la asignación de contenido son opcionales y se preparan desde Administración; no se deducen rasgos personales de la imagen.</p>
+        <p class="vision-copy">El modelo local detecta rostros y estima una franja de edad orientativa. No identifica personas ni analiza el cabello. Los perfiles de ejemplo se introducen manualmente y no se deducen de la imagen.</p>
         <div class="zone-config" id="zone-config" aria-label="Asignación de zonas a estaciones">
           <p class="zone-config-title">Asigna cada zona de la cámara a una estación</p>
           <div class="zone-selects" id="zone-selects"></div>
@@ -122,7 +154,7 @@
             <video id="camera-preview" class="camera-preview" muted playsinline aria-label="Vista previa de la cámara"></video>
             <canvas id="camera-overlay" class="camera-overlay" aria-hidden="true"></canvas>
           </div>
-          <div class="vision-status-wrap"><span class="vision-status-dot" id="camera-status-dot"></span><p id="camera-status" role="status" aria-live="polite">Cámara apagada. Puedes usar la simulación guiada si no quieres conceder acceso.</p><small id="camera-detail">La detección prioriza el rostro para responder rápido y usa la detección de persona como alternativa. El modelo de edad se descarga solo cuando se detecta un rostro; ambos requieren internet. El análisis se realiza en este navegador; no se guardan ni se envían imágenes.</small><div class="vision-metrics" aria-live="polite"><span>Modelo: <strong id="metric-model">Sin iniciar</strong></span><span>Confianza: <strong id="metric-confidence">—</strong></span><span>Inferencia: <strong id="metric-latency">—</strong></span><span>Zona: <strong id="metric-zone">—</strong></span><span>Última detección: <strong id="metric-last-detection">—</strong></span></div></div>
+          <div class="vision-status-wrap"><span class="vision-status-dot" id="camera-status-dot"></span><p id="camera-status" role="status" aria-live="polite">Cámara apagada. No se está capturando imagen.</p><small id="camera-detail">La biblioteca y los pesos de detección y edad están incluidos en este proyecto. El análisis se ejecuta en este navegador; no se guardan ni se envían imágenes.</small><div class="vision-metrics" aria-live="polite"><span>Modelo: <strong id="metric-model">Sin iniciar</strong></span><span>Confianza: <strong id="metric-confidence">—</strong></span><span>Inferencia: <strong id="metric-latency">—</strong></span><span>Zona: <strong id="metric-zone">—</strong></span><span>Última detección: <strong id="metric-last-detection">—</strong></span></div></div>
         </div>
       </section>
 
@@ -131,7 +163,7 @@
           <div><p class="eyebrow">CONTENIDO DE LAS ESTACIONES</p><h2 id="media-title">Vídeos de demostración</h2></div>
           <span class="subtle-label">Archivos locales o enlaces</span>
         </div>
-        <p class="vision-copy">La demo trae preparados enlaces a vídeos genéricos con licencia abierta y selecciona uno según la sección elegida; necesitas internet para reproducirlos. Sustitúyelos aquí por vídeos autorizados de tus productos si los tienes. La cámara estima un rango de edad aproximado, pero no identifica pelo ni barba. Usa MP4, WebM, Ogg o un enlace directo; YouTube, TikTok e Instagram no se reproducen de forma fiable en el bucle.</p>
+        <p class="vision-copy">La demo incluye vídeos de muestra guardados en el proyecto. Sustitúyelos por vídeos autorizados de tus productos si los tienes. Usa MP4, WebM u Ogg; un enlace externo es opcional y necesita internet.</p>
         <div class="media-controls">
           <label class="media-field" for="media-station">Estación
             <select id="media-station" class="field-select"></select>
@@ -170,6 +202,7 @@
           <button id="age-range-update" class="button button-secondary" type="button">Actualizar sugerencias</button>
         </div>
       </section>
+      <p id="presentation-status" class="presentation-status" role="status" aria-live="polite">Preparando el detector local…</p>
       <div id="public-grid" class="device-grid public-grid"></div>
       <section id="guided-complete" class="guided-complete" aria-live="polite" hidden>
         <div><p class="eyebrow">RECORRIDO COMPLETADO</p><h2>La experiencia está lista para volver a empezar.</h2></div>
@@ -177,13 +210,13 @@
       </section>
       <div class="public-bottom"><span>BEAUTY, PERSONALIZED.</span><span>Una nueva forma de descubrir el cuidado.</span></div>
     </section>
-    <button class="button button-secondary presentation-exit" id="presentation-exit" type="button" hidden>Salir · Administración</button>
+    <button class="button button-secondary presentation-exit" id="presentation-exit" type="button" hidden>Volver al inicio</button>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <!-- La IA se descarga solo al activar la cámara; el resto de la web funciona sin esos CDN. -->
+  <!-- La detección funciona con los recursos de IA incluidos en el proyecto. -->
   <script>
     if (location.protocol === "file:") document.getElementById("boot-warning").hidden = false;
   </script>
-  <script type="module" src="js/main.js?v=21"></script>
+  <script type="module" src="js/main.js?v=24"></script>
 </body>
 </html>

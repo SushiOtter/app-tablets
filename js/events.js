@@ -1,6 +1,6 @@
 import { appState, stationStates } from "./state.js";
 import { announce } from "./utils.js";
-import { renderDevices } from "./panels.js?v=21";
+import { renderDevices } from "./panels.js?v=24";
 
 const timers = new Map();
 const attentionTimers = new Map();

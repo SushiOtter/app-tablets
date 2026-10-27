@@ -14,11 +14,16 @@ function deviceMarkup(station, index, withVideo = false, publicMode = false) {
  const tags = clip ? (clip.tags || []).slice(0,3).join(" · ") : (station.tags || []).join(" · ");
  const mediaSlot = station.mediaSlot === null ? -1 : station.mediaSlot ?? station.clipIndex;
  const media = withVideo && playing && mediaSlot >= 0 ? station.mediaFiles?.[mediaSlot] : null;
+ const mediaSources = media
+  ? [{ url: media.url, type: media.type }, ...(media.fallbacks || [])]
+    .map(source => `<source src="${escapeHTML(source.url)}"${source.type ? ` type="${escapeHTML(source.type)}"` : ""}>`)
+    .join("")
+  : "";
  const mediaMarkup = media?.kind === "external"
    ? `<a class="media-external-link" href="${escapeHTML(media.url)}" target="_blank" rel="noopener noreferrer" aria-label="Abrir vídeo de ${escapeHTML(station.name)} en ${escapeHTML(media.provider)}"><span class="media-external-provider">${escapeHTML(media.provider)}</span><span class="media-external-title">Ver vídeo</span><span class="media-external-hint">Se abrirá fuera de la experiencia</span></a>`
    : media?.failed
      ? `<a class="media-external-link" href="${escapeHTML(media.sourceUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Abrir vídeo de ${escapeHTML(station.name)} en una pestaña nueva"><span class="media-external-provider">Vídeo no disponible aquí</span><span class="media-external-title">Abrir enlace</span><span class="media-external-hint">Comprueba el acceso o el formato en el sitio original</span></a>`
-     : media ? `<video class="device-video" src="${escapeHTML(media.url)}" data-station="${station.id}" data-slot="${mediaSlot || 0}" data-media-url="${escapeHTML(media.url)}" muted autoplay playsinline aria-label="Vídeo de ${escapeHTML(station.name)}"></video>` : "";
+     : media ? `<video class="device-video" data-station="${station.id}" data-slot="${mediaSlot || 0}" data-media-url="${escapeHTML(media.url)}" muted autoplay playsinline aria-label="Vídeo de ${escapeHTML(station.name)}">${mediaSources}</video>` : "";
  return `<article class="device ${playing?"is-playing":""} ${!station.enabled?"is-disabled":""}" data-station-id="${escapeHTML(station.id)}" style="--device-accent:${station.tint};--device-deep:${station.deep}" aria-label="${escapeHTML(station.name)}: ${stateLabel}">
   <div class="device-screen ${media ? "has-video" : ""}">
   ${mediaMarkup}

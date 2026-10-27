@@ -1,13 +1,15 @@
 import { appState } from "./state.js";
 import { $, announce, escapeHTML } from "./utils.js";
-import { renderDevices } from "./panels.js?v=21";
-import { emitEvent, resetStation, resetStations } from "./events.js?v=21";
-import { initializeCameraControls, resetCameraPreferences, startCamera, stopCamera } from "./camera.js?v=21";
+import { renderDevices } from "./panels.js?v=24";
+import { emitEvent, resetStation, resetStations } from "./events.js?v=24";
+import { initializeCameraControls, resetCameraPreferences, startCamera, stopCamera } from "./camera.js?v=24";
 import { clearSavedConfiguration, loadConfiguration, renderConfigs, saveConfiguration } from "./configuration.js";
 import { ageProfiles, getAgeProfile } from "./products.js";
 
 let guidedTimer = null;
 let guidedIndex = 0;
+let pendingStationId = "";
+let returnAfterConsent = true;
 const GUIDED_INTERVAL_KEY = "beauty-tech-guided-interval-v1";
 function syncWorkerStationSelection() {
  const select = $("#worker-station");
@@ -26,32 +28,93 @@ function syncWorkerStationSelection() {
    $("#start-section-experience").disabled = false;
  }
 }
-async function startSelectedExperience(stationId, startButton) {
+function startSelectedExperience(stationId) {
  const station = appState.stations.get(stationId);
  if (!stationId) return announce("Activa al menos una sección antes de iniciar la experiencia.");
  if (!station?.enabled) return announce("Elige una sección activa.");
- startButton.disabled = true;
- startButton.textContent = "Preparando experiencia…";
+ pendingStationId = station.id;
+ returnAfterConsent = !$("#worker-view").hidden;
  appState.demoProfile = {
    ageRange: $("#demo-age-range")?.value || "",
    hairTexture: $("#demo-hair-texture")?.value || "",
    hairLength: $("#demo-hair-length")?.value || "",
    beard: $("#demo-beard")?.value || ""
  };
+ $("#worker-view").hidden = true;
+ $("#admin-view").hidden = true;
+ $("#camera-error-view").hidden = true;
+ $("#camera-consent-view").hidden = false;
+ $("#admin-lock").hidden = true;
+ $("#camera-consent-accept")?.focus();
+}
+async function startConsentedExperience() {
+ const acceptButton = $("#camera-consent-accept");
+ const retryButton = $("#camera-error-retry");
+ if (acceptButton.disabled || retryButton.disabled) return;
+ acceptButton.disabled = true;
+ retryButton.disabled = true;
+ const station = appState.stations.get(pendingStationId);
+ if (!station?.enabled) {
+   announce("La sección seleccionada ya no está disponible.");
+   returnToConsentOrigin();
+   acceptButton.disabled = false;
+   retryButton.disabled = false;
+   return;
+ }
+ $("#camera-consent-view").hidden = true;
+ $("#camera-error-view").hidden = true;
+ $("#worker-view").hidden = !returnAfterConsent;
+ $("#admin-view").hidden = returnAfterConsent;
+ $("#admin-lock").hidden = false;
  setPublicMode(true, station.id);
  $("#public-mode-label").textContent = "PREPARANDO DETECCIÓN";
- try {
-   const cameraReady = await startCamera();
-   if (!cameraReady) {
-     setPublicMode(false);
-     announce("No se pudo iniciar la cámara. Revisa el permiso y la conexión y vuelve a intentarlo.");
-     return;
-   }
-   announce(`Experiencia automática lista para ${station.name}. Se activará al detectar a una persona.`);
- } finally {
-   startButton.disabled = false;
-   startButton.textContent = "Iniciar experiencia";
+ const cameraReady = await startCamera();
+ if (!cameraReady) {
+   const errorMessage = $("#camera-status").textContent;
+   setPublicMode(false);
+   $("#worker-view").hidden = true;
+   $("#admin-view").hidden = true;
+   $("#camera-error-view").hidden = false;
+   $("#camera-error-copy").textContent = `${errorMessage} Puedes volver a intentarlo, hacer una simulación sin cámara o regresar al inicio.`;
+   $("#admin-lock").hidden = true;
+   retryButton.focus();
+   acceptButton.disabled = false;
+   retryButton.disabled = false;
+   return;
  }
+ announce(`Detección local lista para ${station.name}. La cámara espera un rostro.`);
+ acceptButton.disabled = false;
+ retryButton.disabled = false;
+}
+function returnToConsentOrigin() {
+ $("#camera-consent-view").hidden = true;
+ $("#camera-error-view").hidden = true;
+ $("#worker-view").hidden = !returnAfterConsent;
+ $("#admin-view").hidden = returnAfterConsent;
+ $("#admin-lock").hidden = false;
+ if (returnAfterConsent) appState.returnToWorker = true;
+ (returnAfterConsent ? $("#worker-start") : $("#start-section-experience"))?.focus();
+}
+function returnToWorkerHome() {
+ stopCamera();
+ appState.returnToWorker = true;
+ if (appState.mode === "public") {
+   setPublicMode(false);
+ }
+ $("#camera-consent-view").hidden = true;
+ $("#camera-error-view").hidden = true;
+ $("#admin-view").hidden = true;
+ $("#worker-view").hidden = false;
+ $("#admin-lock").hidden = false;
+ $("#worker-start")?.focus();
+}
+function startCameraFreeDemo() {
+ $("#camera-error-view").hidden = true;
+ $("#admin-view").hidden = false;
+ $("#worker-view").hidden = true;
+ $("#admin-lock").hidden = false;
+ appState.returnToWorker = false;
+ startGuidedDemo();
 }
 function updateAgeRecommendations(range, manuallySelected = false) {
  const panel = $("#age-recommendation-panel");
@@ -92,6 +155,11 @@ function initializeAgeRecommendations() {
  $("#age-range-update").addEventListener("click", () => {
   if (!ageProfiles[select.value] || select.value === "general") return announce("Selecciona un rango de edad para actualizar las sugerencias.");
   updateAgeRecommendations(select.value, true);
+  if (appState.presentationMode) {
+   window.dispatchEvent(new CustomEvent("beautytech:age-estimated", {
+    detail: { stationId: appState.presentationStationId, ageGroup: select.value, source: "manual-range-selection" }
+   }));
+  }
   announce("Sugerencias actualizadas para el rango seleccionado.");
  });
  window.addEventListener("beautytech:age-estimated", ({ detail = {} }) => {
@@ -142,7 +210,19 @@ export function initializeAdmin() {
    cameraSelect.value = event.target.value;
    cameraSelect.dispatchEvent(new Event("change"));
  });
- $("#worker-start")?.addEventListener("click", event => startSelectedExperience($("#worker-station").value, event.currentTarget));
+ $("#worker-start")?.addEventListener("click", () => startSelectedExperience($("#worker-station").value));
+ $("#start-section-experience")?.addEventListener("click", () => startSelectedExperience($("#camera-station")?.value || ""));
+ window.addEventListener("beautytech:camera-consent-requested", () => {
+   startSelectedExperience($("#camera-station")?.value || $("#worker-station")?.value || "");
+ });
+ $("#camera-consent-accept")?.addEventListener("click", startConsentedExperience);
+ $("#camera-consent-decline")?.addEventListener("click", () => {
+   returnToConsentOrigin();
+   announce("No se ha activado la cámara ni se ha iniciado la detección.");
+ });
+ $("#camera-error-retry")?.addEventListener("click", startConsentedExperience);
+ $("#camera-error-demo")?.addEventListener("click", startCameraFreeDemo);
+ $("#camera-error-home")?.addEventListener("click", returnToWorkerHome);
  initializeAgeRecommendations();
  try {
    const savedInterval = Number(localStorage.getItem(GUIDED_INTERVAL_KEY));
@@ -241,7 +321,6 @@ export function initializeAdmin() {
    } else emitEvent("attention", target.id);
  });
  $("#start-public").addEventListener("click", () => setPublicMode(true));
- $("#start-section-experience")?.addEventListener("click", event => startSelectedExperience($("#camera-station")?.value || "", event.currentTarget));
  $("#guided-demo").addEventListener("click", startGuidedDemo);
  $("#guided-stop").addEventListener("click", () => setPublicMode(false));
  $("#guided-repeat").addEventListener("click", startGuidedDemo);
@@ -274,13 +353,13 @@ export function initializeAdmin() {
  });
  $("#presentation-exit")?.addEventListener("click", () => {
    stopCamera();
-   appState.returnToWorker = false;
+   appState.returnToWorker = true;
    setPublicMode(false);
  });
  window.addEventListener("keydown", event => {
    if (event.key === "Escape" && appState.presentationMode) {
      stopCamera();
-     appState.returnToWorker = false;
+     appState.returnToWorker = true;
      setPublicMode(false);
    }
  });
