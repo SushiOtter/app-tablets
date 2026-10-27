@@ -129,6 +129,9 @@ export function resetCameraPreferences() {
 export async function startCamera() {
   if (stream) return true;
   const token = ++startToken;
+  video = appState.mode === "public" ? $("#scan-camera-preview") : $("#camera-preview");
+  canvas = appState.mode === "public" ? $("#scan-camera-overlay") : $("#camera-overlay");
+  context = canvas?.getContext("2d") || null;
   if (!navigator.mediaDevices?.getUserMedia) {
     status("Este navegador no permite usar la cámara. Abre la demo en Chrome o Edge desde localhost."); return false;
   }
@@ -178,7 +181,9 @@ function drawOverlay(detection) {
   if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
   context.clearRect(0, 0, width, height); context.save();
   context.strokeStyle = "rgba(255,255,255,.76)"; context.lineWidth = Math.max(1.5, width / 320);
-  for (let i = 1; i < ZONE_COUNT; i++) { const x = width * i / ZONE_COUNT; context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke(); }
+  if (appState.mode !== "public") {
+    for (let i = 1; i < ZONE_COUNT; i++) { const x = width * i / ZONE_COUNT; context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke(); }
+  }
   if (detection) {
     const [x, y, w, h] = detection.bbox;
     context.strokeStyle = detection.kind === "face" ? "#83b7a5" : "#c8a977"; context.lineWidth = Math.max(3, width / 180); context.strokeRect(x, y, w, h);
@@ -259,10 +264,12 @@ async function onSustainedPresence({ confidence, areaRatio, dwellMs, zone, stati
   emitEvent("attention", station.id, { proximity: Math.min(0.95, 0.45 + areaRatio * 2.5), dwellMs, orientation: null, confidence, zone: zone + 1, source: "face-api-local-detection" });
   status(`Presencia detectada por IA. Activando ${station.name}.`, true);
   if (kind === "face") {
-    void estimateAgeRange(video).then(ageGroup => {
+    void estimateAgeRange(video).then(result => {
       if (!stream || token !== startToken || appState.mode !== "public" || !personPresent || activeTargetStationId !== station.id) return;
       metric("#metric-model", "Rostro + edad local");
-      window.dispatchEvent(new CustomEvent("beautytech:age-estimated", { detail: { stationId: station.id, ageGroup } }));
+      window.dispatchEvent(new CustomEvent("beautytech:age-estimated", {
+        detail: { stationId: station.id, ageGroup: result.range, source: "camera", reason: result.reason, sampleCount: result.sampleCount }
+      }));
     }).catch(error => {
       if (!stream || token !== startToken) return;
       console.error("No se pudo estimar el rango de edad:", error);
@@ -270,11 +277,15 @@ async function onSustainedPresence({ confidence, areaRatio, dwellMs, zone, stati
     });
   }
 }
-export function stopCamera(updateStatus = true) {
+export function stopCamera(updateStatus = true, preservePublicSession = false) {
   startToken += 1; if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (stream) stream.getTracks().forEach(track => track.stop()); stream = null;
   if (video) { video.pause(); video.srcObject = null; }
   if (context && canvas) context.clearRect(0, 0, canvas.width, canvas.height);
+  if (preservePublicSession) {
+    personPresent = false; personStartedAt = 0; triggeredThisPresence = false;
+    latestZone = -1; activeTargetStationId = "";
+  }
   inferenceBusy = false; inferenceFailed = false; missedDetectionSince = 0; resetPresence(); setControls(false);
   if (updateStatus) status("Cámara apagada. No se está capturando imagen.");
 }

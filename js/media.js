@@ -1,32 +1,18 @@
 import { appState } from "./state.js";
 import { $, escapeHTML } from "./utils.js";
-import { renderDevices } from "./panels.js?v=24";
+import { renderDevices } from "./panels.js?v=32";
 
 const objectUrls = new Set();
 let selectedStationId = "";
 const MEDIA_STORAGE_KEY = "beauty-tech-retail-media-urls-v1";
 const MEDIA_SLOT_COUNT = 6;
-const DEFAULT_DEMO_MEDIA = {
-  cosmetics: {
-    name: "Demostración de cosmética · Sha'Boris · CC BY-SA 4.0 · local",
-    url: "./assets/videos/cosmetics-demo.mp4",
-    type: 'video/mp4; codecs="av01.0.05M.08"',
-    fallbacks: [{ url: "./assets/videos/cosmetics-demo.webm", type: 'video/webm; codecs="vp8, vorbis"' }]
-  },
-  hair: {
-    name: "Cuidado capilar · Blackgirlmighty · CC0 · local",
-    url: "./assets/videos/haircare-demo.mp4",
-    type: 'video/mp4; codecs="av01.0.05M.08"',
-    fallbacks: [{ url: "./assets/videos/haircare-demo.webm", type: 'video/webm; codecs="vp8, vorbis"' }]
-  }
-};
+const AGE_MEDIA_KEYS = ["18-29", "30-44", "45-59", "60+", "all"];
 const MEDIA_AUDIENCES = [
-  ["all", "Vídeo general (reserva)"],
-  ["under18", "Menos de 18 · estimación visual"],
-  ["18-24", "18–24 · estimación visual"],
-  ["25-34", "25–34 · estimación visual"],
-  ["35-44", "35–44 · estimación visual"],
-  ["45-plus", "45 o más · estimación visual"],
+  ["all", "Todas las edades"],
+  ["18-29", "18–29 · estimación orientativa"],
+  ["30-44", "30–44 · estimación orientativa"],
+  ["45-59", "45–59 · estimación orientativa"],
+  ["60+", "60+ · estimación orientativa"],
   ["curly", "Pelo rizado · solo etiqueta manual"],
   ["straight", "Pelo liso · solo etiqueta manual"],
   ["short", "Pelo corto · solo etiqueta manual"],
@@ -204,19 +190,20 @@ function restoreMediaLinks() {
   }
 }
 
-function seedDemoVideos() {
+function seedAgeVideos() {
   for (const station of appState.stations.values()) {
     ensureMediaSlots(station);
-    if (station.mediaFiles.some(media => media?.url)) continue;
-    const demo = ["haircare", "haircolor"].includes(station.id)
-      ? DEFAULT_DEMO_MEDIA.hair
-      : DEFAULT_DEMO_MEDIA.cosmetics;
-    station.mediaFiles[0] = {
-      ...demo,
-      kind: "video",
-      audience: "all",
-      builtIn: true
-    };
+    AGE_MEDIA_KEYS.forEach((audience, slot) => {
+      const url = station.video?.[audience];
+      if (typeof url !== "string" || !url.trim() || station.mediaFiles[slot]) return;
+      station.mediaFiles[slot] = {
+        name: `${station.name} · ${audience}`,
+        url: new URL(url, document.baseURI).href,
+        kind: "video",
+        audience,
+        poster: station.posterByAge?.[audience] || ""
+      };
+    });
   }
 }
 
@@ -224,7 +211,7 @@ export function initializeMediaControls() {
   const select = $("#media-station");
   if (!select) return;
   restoreMediaLinks();
-  seedDemoVideos();
+  seedAgeVideos();
   renderMediaSlots();
   select.innerHTML = [...appState.stations.values()].map(station => `<option value="${station.id}">${escapeHTML(station.name)}</option>`).join("");
   selectedStationId = select.value;

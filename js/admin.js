@@ -1,15 +1,16 @@
 import { appState } from "./state.js";
 import { $, announce, escapeHTML } from "./utils.js";
-import { renderDevices } from "./panels.js?v=24";
-import { emitEvent, resetStation, resetStations } from "./events.js?v=24";
-import { initializeCameraControls, resetCameraPreferences, startCamera, stopCamera } from "./camera.js?v=24";
-import { clearSavedConfiguration, loadConfiguration, renderConfigs, saveConfiguration } from "./configuration.js";
-import { ageProfiles, getAgeProfile } from "./products.js";
+import { renderDevices } from "./panels.js?v=32";
+import { emitEvent, resetStation, resetStations } from "./events.js?v=32";
+import { initializeCameraControls, resetCameraPreferences, startCamera, stopCamera } from "./camera.js?v=32";
+import { clearSavedConfiguration, loadConfiguration, renderConfigs, saveConfiguration } from "./configuration.js?v=32";
+import { ageProfiles, getAgeProfile } from "./products.js?v=32";
 
 let guidedTimer = null;
 let guidedIndex = 0;
 let pendingStationId = "";
 let returnAfterConsent = true;
+let scanTimeout = null;
 const GUIDED_INTERVAL_KEY = "beauty-tech-guided-interval-v1";
 function syncWorkerStationSelection() {
  const select = $("#worker-station");
@@ -63,13 +64,25 @@ async function startConsentedExperience() {
  }
  $("#camera-consent-view").hidden = true;
  $("#camera-error-view").hidden = true;
+ $("#scan-view").hidden = false;
+ $("#scan-status").textContent = "Buscando un solo rostro…";
+ $("#scan-progress").value = 0;
+ $("#scan-progress-label").textContent = "0 de 10 lecturas · máximo 20 segundos";
  $("#worker-view").hidden = !returnAfterConsent;
  $("#admin-view").hidden = returnAfterConsent;
  $("#admin-lock").hidden = false;
  setPublicMode(true, station.id);
  $("#public-mode-label").textContent = "PREPARANDO DETECCIÓN";
+ clearTimeout(scanTimeout);
+ scanTimeout = setTimeout(() => {
+   completeAgeScan("all", "scan-timeout");
+   $("#scan-status").textContent = "No se obtuvo una lectura fiable. Mostramos contenido para todas las edades.";
+ }, 20000);
  const cameraReady = await startCamera();
  if (!cameraReady) {
+   clearTimeout(scanTimeout);
+   scanTimeout = null;
+   $("#scan-view").hidden = true;
    const errorMessage = $("#camera-status").textContent;
    setPublicMode(false);
    $("#worker-view").hidden = true;
@@ -86,7 +99,17 @@ async function startConsentedExperience() {
  acceptButton.disabled = false;
  retryButton.disabled = false;
 }
+function completeAgeScan(ageGroup, source) {
+ clearTimeout(scanTimeout);
+ scanTimeout = null;
+ window.dispatchEvent(new CustomEvent("beautytech:age-estimated", {
+  detail: { ageGroup, source }
+ }));
+}
 function returnToConsentOrigin() {
+ clearTimeout(scanTimeout);
+ scanTimeout = null;
+ $("#scan-view").hidden = true;
  $("#camera-consent-view").hidden = true;
  $("#camera-error-view").hidden = true;
  $("#worker-view").hidden = !returnAfterConsent;
@@ -96,6 +119,9 @@ function returnToConsentOrigin() {
  (returnAfterConsent ? $("#worker-start") : $("#start-section-experience"))?.focus();
 }
 function returnToWorkerHome() {
+ clearTimeout(scanTimeout);
+ scanTimeout = null;
+ $("#scan-view").hidden = true;
  stopCamera();
  appState.returnToWorker = true;
  if (appState.mode === "public") {
@@ -108,6 +134,21 @@ function returnToWorkerHome() {
  $("#admin-lock").hidden = false;
  $("#worker-start")?.focus();
 }
+function continueWithoutCamera() {
+ clearTimeout(scanTimeout);
+ scanTimeout = null;
+ stopCamera(true, true);
+ $("#scan-view").hidden = true;
+ $("#camera-consent-view").hidden = true;
+ $("#camera-error-view").hidden = true;
+ if (appState.mode !== "public") {
+  $("#worker-view").hidden = !returnAfterConsent;
+  $("#admin-view").hidden = returnAfterConsent;
+  setPublicMode(true, pendingStationId);
+ }
+ completeAgeScan("all", "no-camera");
+ announce("Se muestran recomendaciones generales para todas las edades; no se ha usado la cámara.");
+}
 function startCameraFreeDemo() {
  $("#camera-error-view").hidden = true;
  $("#admin-view").hidden = false;
@@ -116,9 +157,9 @@ function startCameraFreeDemo() {
  appState.returnToWorker = false;
  startGuidedDemo();
 }
-function updateAgeRecommendations(range, manuallySelected = false) {
+function updateAgeRecommendations(range, manuallySelected = false, reason = "") {
  const panel = $("#age-recommendation-panel");
- const validRange = Object.prototype.hasOwnProperty.call(ageProfiles, range) && range !== "general";
+ const validRange = Object.prototype.hasOwnProperty.call(ageProfiles, range);
  const selectedRange = validRange ? range : null;
  const profile = getAgeProfile(selectedRange);
  const title = $("#age-recommendation-title");
@@ -126,14 +167,24 @@ function updateAgeRecommendations(range, manuallySelected = false) {
  const list = $("#age-product-list");
  const select = $("#age-range-select");
  panel.hidden = false;
- title.textContent = selectedRange
-  ? `${manuallySelected ? "Rango seleccionado" : "Rango estimado"}: ${profile.label}`
-  : "No se pudo estimar la edad";
- copy.textContent = selectedRange
-  ? manuallySelected
-   ? "Estas sugerencias generales se muestran para el rango que has elegido."
-   : "Estas sugerencias generales se muestran para el rango estimado. Puedes corregirlo si no coincide contigo."
-  : "Se muestran ideas generales. Si quieres, selecciona un rango para adaptar las sugerencias.";
+ title.textContent = selectedRange === "all" && !manuallySelected
+  ? "Contenido para todas las edades"
+  : selectedRange
+   ? `${manuallySelected ? "Rango seleccionado" : "Rango estimado"}: ${profile.label}`
+   : "No se pudo estimar la edad";
+ copy.textContent = manuallySelected
+  ? "Estas sugerencias generales se muestran para el rango que has elegido."
+  : reason === "multiple-faces"
+   ? "Se han detectado varias personas; por privacidad, mostramos contenido general."
+   : reason === "under-18"
+    ? "Para proteger la privacidad, mostramos contenido para todas las edades."
+    : reason === "no-camera"
+     ? "Has elegido continuar sin cámara; no se ha estimado la edad."
+     : reason === "scan-timeout" || reason === "insufficient-readings"
+      ? "No se obtuvo una lectura fiable; mostramos contenido general."
+      : selectedRange
+       ? "Estas sugerencias generales se muestran para el rango estimado. Puedes corregirlo si no coincide contigo."
+       : "Se muestran ideas generales. Si quieres, selecciona un rango para adaptar las sugerencias.";
  list.replaceChildren(...profile.products.map(product => {
   const item = document.createElement("li");
   item.textContent = product;
@@ -150,20 +201,44 @@ function resetAgeRecommendations() {
 function initializeAgeRecommendations() {
  const select = $("#age-range-select");
  select.innerHTML = `<option value="" selected disabled>Selecciona un rango</option>${Object.entries(ageProfiles)
-  .filter(([range]) => range !== "general")
   .map(([range, profile]) => `<option value="${range}">${profile.label}</option>`).join("")}`;
  $("#age-range-update").addEventListener("click", () => {
-  if (!ageProfiles[select.value] || select.value === "general") return announce("Selecciona un rango de edad para actualizar las sugerencias.");
+  if (!ageProfiles[select.value]) return announce("Selecciona un rango de edad para actualizar las sugerencias.");
   updateAgeRecommendations(select.value, true);
-  if (appState.presentationMode) {
-   window.dispatchEvent(new CustomEvent("beautytech:age-estimated", {
-    detail: { stationId: appState.presentationStationId, ageGroup: select.value, source: "manual-range-selection" }
-   }));
-  }
+  window.dispatchEvent(new CustomEvent("beautytech:age-estimated", {
+   detail: { ageGroup: select.value, source: "manual-range-selection" }
+  }));
   announce("Sugerencias actualizadas para el rango seleccionado.");
  });
  window.addEventListener("beautytech:age-estimated", ({ detail = {} }) => {
-  if (appState.mode === "public") updateAgeRecommendations(detail.ageGroup);
+  if (appState.mode === "public") {
+   updateAgeRecommendations(detail.ageGroup, detail.source === "manual-range-selection", detail.reason || detail.source);
+   if (detail.source !== "manual-range-selection") {
+    $("#scan-view").hidden = true;
+    const sampleCount = Math.min(10, Math.max(0, Number(detail.sampleCount) || 0));
+    $("#scan-progress").value = sampleCount;
+    $("#scan-status").textContent = detail.reason === "multiple-faces"
+     ? "Se han detectado varias personas. Mostramos contenido para todas las edades."
+     : detail.reason === "under-18"
+      ? "Para proteger la privacidad, mostramos contenido para todas las edades."
+      : detail.reason === "insufficient-readings" || detail.source === "scan-timeout"
+       ? "No se obtuvo una lectura fiable. Mostramos contenido para todas las edades."
+       : "Lectura completada.";
+    $("#scan-progress-label").textContent = sampleCount
+     ? `${sampleCount} de 10 lecturas`
+     : "Lectura no disponible · contenido general";
+    stopCamera(true, true);
+   }
+  }
+ });
+ window.addEventListener("beautytech:age-scan-progress", ({ detail = {} }) => {
+  if (appState.mode !== "public") return;
+  const completed = Math.min(10, Math.max(0, Number(detail.completed) || 0));
+  $("#scan-progress").value = completed;
+  $("#scan-progress-label").textContent = `${completed} de 10 lecturas · máximo 20 segundos`;
+  $("#scan-status").textContent = completed
+   ? "Midiendo una franja aproximada de edad…"
+   : "Buscando un solo rostro…";
  });
 }
 function guidedIntervalMs() {
@@ -216,13 +291,26 @@ export function initializeAdmin() {
    startSelectedExperience($("#camera-station")?.value || $("#worker-station")?.value || "");
  });
  $("#camera-consent-accept")?.addEventListener("click", startConsentedExperience);
- $("#camera-consent-decline")?.addEventListener("click", () => {
-   returnToConsentOrigin();
-   announce("No se ha activado la cámara ni se ha iniciado la detección.");
- });
+ $("#camera-consent-decline")?.addEventListener("click", continueWithoutCamera);
  $("#camera-error-retry")?.addEventListener("click", startConsentedExperience);
  $("#camera-error-demo")?.addEventListener("click", startCameraFreeDemo);
+ $("#camera-error-no-camera")?.addEventListener("click", continueWithoutCamera);
  $("#camera-error-home")?.addEventListener("click", returnToWorkerHome);
+ $("#scan-cancel")?.addEventListener("click", returnToWorkerHome);
+ $("#scan-without-camera")?.addEventListener("click", continueWithoutCamera);
+ window.addEventListener("beautytech:session-timeout", () => {
+  stopCamera();
+  $("#scan-view").hidden = true;
+  setPublicMode(false);
+  appState.returnToWorker = true;
+  announce("La experiencia ha vuelto al inicio tras dos minutos sin interacción.");
+ });
+ window.addEventListener("pointerdown", () => {
+  if (appState.mode === "public") window.dispatchEvent(new CustomEvent("beautytech:activity"));
+ });
+ window.addEventListener("keydown", () => {
+  if (appState.mode === "public") window.dispatchEvent(new CustomEvent("beautytech:activity"));
+ });
  initializeAgeRecommendations();
  try {
    const savedInterval = Number(localStorage.getItem(GUIDED_INTERVAL_KEY));
@@ -365,7 +453,13 @@ export function initializeAdmin() {
  });
 }
 export function setPublicMode(enabled, presentationStationId = "") {
- if (!enabled) stopGuidedDemo();
+ if (!enabled) {
+  stopGuidedDemo();
+  $("#scan-view").hidden = true;
+  const player = $("#station-player");
+  player?.querySelector("video")?.pause();
+  if (player) player.hidden = true;
+ }
  if (enabled) appState.returnToWorker = !$("#worker-view").hidden;
  // Cancela temporizadores de sesiones anteriores al cambiar de modo.
  clearTimeout(appState.sessionTimer);
@@ -385,8 +479,11 @@ export function setPublicMode(enabled, presentationStationId = "") {
  $("#admin-lock").textContent = enabled ? "Salir · Administración ↗" : appState.returnToWorker ? "Administración ↗" : "Modo trabajador ↗";
  $("#system-status").textContent = enabled ? "Modo público activo" : "Sistema preparado";
  if (enabled) {
+   appState.ageGroup = "all";
+   appState.ageGroupSource = "default";
    appState.sessionActive = false;
    resetStations();
+   window.dispatchEvent(new CustomEvent("beautytech:activity"));
    announce("Modo público activo. La instalación espera señales de interés.");
  } else {
    appState.sessionActive = false;

@@ -1,6 +1,7 @@
 import { appState, stationStates } from "./state.js";
 import { announce } from "./utils.js";
-import { renderDevices } from "./panels.js?v=24";
+import { renderDevices } from "./panels.js?v=32";
+import { ageProfiles } from "./products.js?v=32";
 
 const timers = new Map();
 const attentionTimers = new Map();
@@ -18,6 +19,7 @@ export function emitEvent(type, stationId = null, signals = {}) {
 }
 
 export function initializeEventEngine() {
+  window.addEventListener("beautytech:activity", refreshSessionTimeout);
   window.addEventListener("beautytech:event", ({ detail }) => {
     if (detail.type === "entry") startSession();
     if (detail.type === "attention" && detail.stationId) activateStation(detail.stationId, detail.signals);
@@ -25,20 +27,17 @@ export function initializeEventEngine() {
     if (detail.type === "session-end") endSession();
   });
   window.addEventListener("beautytech:age-estimated", ({ detail }) => {
-    const station = appState.stations.get(detail.stationId);
-    if (!station || !detail.ageGroup || !station.loopWhilePresent || station.state !== stationStates.PLAYING) return;
-    station.activeSignals ||= {};
-    station.activeSignals.ageGroup = detail.ageGroup;
-    const playlist = buildMediaPlaylist(station, station.activeSignals);
-    if (!playlist.length) return;
-    station.mediaPlaylist = playlist;
-    const currentIndex = playlist.indexOf(station.mediaSlot);
-    if (currentIndex === 0) {
+    if (!ageProfiles[detail.ageGroup]) return;
+    appState.ageGroup = detail.ageGroup;
+    appState.ageGroupSource = detail.source === "manual-range-selection" ? "manual" : detail.source === "camera" ? "camera" : "default";
+    for (const station of appState.stations.values()) {
+      station.activeSignals ||= {};
+      station.activeSignals.ageGroup = detail.ageGroup;
+      station.mediaPlaylist = buildMediaPlaylist(station, station.activeSignals);
       station.mediaCursor = 0;
-      return;
+      station.mediaSlot = station.mediaPlaylist[0] ?? null;
     }
-    station.mediaCursor = 0;
-    playNextMedia(station);
+    renderDevices();
   });
   window.addEventListener("beautytech:media-ended", ({ detail }) => {
     const station = appState.stations.get(detail.stationId);
@@ -77,11 +76,14 @@ function startSession() {
 
 function refreshSessionTimeout() {
   clearTimeout(appState.sessionTimer);
-  if (appState.presentationMode && appState.mode === "public") {
+  if (appState.mode !== "public") {
     appState.sessionTimer = null;
     return;
   }
-  appState.sessionTimer = setTimeout(endSession, appState.config.settings.sessionTimeoutMs);
+  appState.sessionTimer = setTimeout(() => {
+    endSession();
+    window.dispatchEvent(new CustomEvent("beautytech:session-timeout"));
+  }, appState.config.settings.sessionTimeoutMs);
 }
 
 /* Algoritmo demostrativo: puntúa clips según familia/campaña y señales disponibles.
@@ -108,15 +110,12 @@ function rankClips(station, signals = {}) {
 }
 
 function buildMediaPlaylist(station, signals = {}) {
-  const profile = signals.demoProfile || appState.demoProfile || {};
-  const detectedAge = signals.ageGroup;
-  const profileValues = [profile.ageRange, profile.hairTexture, profile.hairLength, profile.beard].filter(Boolean);
+  const detectedAge = signals.ageGroup || appState.ageGroup;
   const availableMedia = (station.mediaFiles || []).map((media, slot) => ({ media, slot }))
     .filter(item => item.media && item.media.kind !== "external" && !item.media.failed);
-  const matchingMedia = availableMedia.filter(({ media }) =>
-    media.audience && media.audience !== "all" && (media.audience === detectedAge || profileValues.includes(media.audience)));
-  const generalMedia = availableMedia.filter(({ media }) => !media.audience || media.audience === "all");
-  return [...matchingMedia, ...generalMedia].map(item => item.slot);
+  return availableMedia
+    .filter(({ media }) => media.audience === detectedAge || detectedAge === "all" && media.audience === "all")
+    .map(item => item.slot);
 }
 
 function activateStation(id, signals = {}) {
